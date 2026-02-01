@@ -6,6 +6,7 @@ import { addSectionCommand } from '../src/commands/add-section.js';
 import { removeSectionCommand } from '../src/commands/remove-section.js';
 import { moveSectionCommand } from '../src/commands/move-section.js';
 import { createComponentCommand } from '../src/commands/create-component.js';
+import { listSectionsCommand } from '../src/commands/list-sections.js';
 
 const program = new Command();
 
@@ -24,6 +25,8 @@ program
   .command('add-section <route> <featurePath>')
   .description('Create a route + feature binding')
   .option('--layout <name>', 'Layout component name', 'Main')
+  .option('--dry-run', 'Show what would be created without creating')
+  .option('--force', 'Overwrite existing files')
   .action(addSectionCommand);
 
 program
@@ -59,5 +62,10 @@ program
   .option('--dry-run', 'Show what would be created without creating')
   .option('--force', 'Overwrite existing files')
   .action(createComponentCommand);
+
+program
+  .command('list-sections')
+  .description('List all Textor-managed sections')
+  .action(listSectionsCommand);
 
 program.parse();

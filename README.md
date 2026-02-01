@@ -85,7 +85,15 @@ pnpm textor move-section /users users/catalog /members members/list
 
 Moves files, updates imports, cleans up empty directories.
 
-### 4. Remove a Section
+### 4. List Sections
+
+```bash
+pnpm textor list-sections
+```
+
+Shows all routes and features currently managed by Textor.
+
+### 5. Remove a Section
 
 ```bash
 # Preview what will be deleted
@@ -112,7 +120,7 @@ pnpm textor init [--force]
 Create a route + feature binding.
 
 ```bash
-pnpm textor add-section <route> <featurePath> [--layout <name>]
+pnpm textor add-section <route> <featurePath> [--layout <name>] [--dry-run] [--force]
 ```
 
 **Examples:**

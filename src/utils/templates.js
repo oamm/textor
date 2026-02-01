@@ -1,4 +1,27 @@
+import { existsSync, readFileSync } from 'fs';
+import path from 'path';
+
+function getTemplateOverride(templateName, data = {}) {
+  const overridePath = path.join(process.cwd(), '.textor', 'templates', `${templateName}.astro`);
+  if (existsSync(overridePath)) {
+    let content = readFileSync(overridePath, 'utf-8');
+    for (const [key, value] of Object.entries(data)) {
+      content = content.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    }
+    return content;
+  }
+  return null;
+}
+
 export function generateRouteTemplate(layoutName, layoutImportPath, featureImportPath, featureComponentName) {
+  const override = getTemplateOverride('route', {
+    layoutName,
+    layoutImportPath,
+    featureImportPath,
+    featureComponentName
+  });
+  if (override) return override;
+
   return `---
 import ${layoutName} from '${layoutImportPath}';
 import ${featureComponentName} from '${featureImportPath}';
@@ -11,6 +34,9 @@ import ${featureComponentName} from '${featureImportPath}';
 }
 
 export function generateFeatureTemplate(componentName) {
+  const override = getTemplateOverride('feature', { componentName });
+  if (override) return override;
+
   return `---
 // Feature: ${componentName}
 ---
@@ -27,6 +53,9 @@ export function generateScriptsIndexTemplate() {
 }
 
 export function generateComponentTemplate(componentName) {
+  const override = getTemplateOverride('component', { componentName });
+  if (override) return override;
+
   return `---
 export type Props = {
   // Add props here
@@ -42,6 +71,9 @@ const props = Astro.props;
 }
 
 export function generateHookTemplate(componentName, hookName) {
+  const override = getTemplateOverride('hook', { componentName, hookName });
+  if (override) return override;
+
   return `import { useState } from 'react';
 
 export function ${hookName}() {
@@ -55,6 +87,9 @@ export function ${hookName}() {
 }
 
 export function generateContextTemplate(componentName) {
+  const override = getTemplateOverride('context', { componentName });
+  if (override) return override;
+
   return `import { createContext, useContext } from 'react';
 
 //@ts-ignore
@@ -87,6 +122,9 @@ export function use${componentName}Context() {
 }
 
 export function generateTestTemplate(componentName, componentPath) {
+  const override = getTemplateOverride('test', { componentName, componentPath });
+  if (override) return override;
+
   return `import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ${componentName} from '${componentPath}';

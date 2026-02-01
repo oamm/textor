@@ -196,6 +196,20 @@ function validateConfig(config) {
       throw new Error(`Invalid configuration: missing or invalid "${section}" section`);
     }
   }
+
+  // Validate paths are strings
+  for (const [key, value] of Object.entries(config.paths)) {
+    if (typeof value !== 'string') {
+      throw new Error(`Invalid configuration: "paths.${key}" must be a string`);
+    }
+  }
+
+  // Validate naming extensions start with dot
+  for (const [key, value] of Object.entries(config.naming)) {
+    if (typeof value === 'string' && !value.startsWith('.') && value !== '') {
+      throw new Error(`Invalid configuration: "naming.${key}" should start with a dot (e.g., ".astro")`);
+    }
+  }
 }
 
 /**

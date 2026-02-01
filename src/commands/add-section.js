@@ -37,9 +37,27 @@ export async function addSectionCommand(route, featurePath, options) {
     const routeFilePath = path.join(pagesRoot, routeFileName);
     const featureDirPath = path.join(featuresRoot, normalizedFeaturePath);
     const featureFilePath = path.join(featureDirPath, featureFileName);
+    const scriptsIndexPath = path.join(featureDirPath, config.features.scriptsIndexFile);
+    const componentsDirPath = path.join(featureDirPath, 'Components');
     
-    await ensureNotExists(routeFilePath, false);
-    await ensureNotExists(featureFilePath, false);
+    if (options.dryRun) {
+      console.log('Dry run - would create:');
+      console.log(`  Route: ${routeFilePath}`);
+      console.log(`  Feature: ${featureFilePath}`);
+      
+      if (config.features.createComponentsDir) {
+        console.log(`  Components: ${componentsDirPath}/`);
+      }
+      
+      if (config.features.createScriptsDir) {
+        console.log(`  Scripts: ${scriptsIndexPath}`);
+      }
+      
+      return;
+    }
+
+    await ensureNotExists(routeFilePath, options.force);
+    await ensureNotExists(featureFilePath, options.force);
     
     let layoutImportPath;
     if (config.importAliases.layouts) {
@@ -81,12 +99,10 @@ export async function addSectionCommand(route, featurePath, options) {
     );
     
     if (config.features.createComponentsDir) {
-      const componentsDirPath = path.join(featureDirPath, 'Components');
       await ensureDir(componentsDirPath);
     }
     
     if (config.features.createScriptsDir) {
-      const scriptsIndexPath = path.join(featureDirPath, config.features.scriptsIndexFile);
       await writeFileWithSignature(
         scriptsIndexPath,
         generateScriptsIndexTemplate(),
@@ -99,11 +115,11 @@ export async function addSectionCommand(route, featurePath, options) {
     console.log(`  Feature: ${featureFilePath}`);
     
     if (config.features.createComponentsDir) {
-      console.log(`  Components: ${path.join(featureDirPath, 'Components')}/`);
+      console.log(`  Components: ${componentsDirPath}/`);
     }
     
     if (config.features.createScriptsDir) {
-      console.log(`  Scripts: ${path.join(featureDirPath, config.features.scriptsIndexFile)}`);
+      console.log(`  Scripts: ${scriptsIndexPath}`);
     }
     
   } catch (error) {
