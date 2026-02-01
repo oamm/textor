@@ -1,0 +1,34 @@
+{
+  "name": "textor",
+  "version": "1.0.0",
+  "description": "Safe, deterministic scaffolding and refactoring tool for Astro projects",
+  "type": "module",
+  "bin": {
+    "textor": "./bin/textor.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "keywords": [
+    "astro",
+    "scaffolding",
+    "cli",
+    "tooling"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "peerDependencies": {
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
