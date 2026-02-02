@@ -17,10 +17,29 @@ import {
   secureJoin
 } from '../utils/filesystem.js';
 import { loadState, findSection, saveState } from '../utils/state.js';
+import { isRepoClean } from '../utils/git.js';
 
+/**
+ * Move a section (route + feature).
+ * 
+ * SCOPE GUARANTEES:
+ * - Automatically updates imports in the moved route file.
+ * - Automatically updates internal imports/references within the moved feature directory.
+ * - Repo-wide scan for import updates is available via the --scan flag.
+ * 
+ * NON-GOALS (What it won't rewrite):
+ * - String literals (unless they match the component name exactly in a JSX context).
+ * - Markdown documentation (except for those registered in state).
+ * - Dynamic imports with complex template literals.
+ */
 export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeature, options) {
   try {
     const config = await loadConfig();
+
+    if (config.git?.requireCleanRepo && !await isRepoClean()) {
+      throw new Error('Git repository is not clean. Please commit or stash your changes before proceeding.');
+    }
+
     const state = await loadState();
 
     let actualFromRoute = fromRoute;
@@ -119,7 +138,9 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     const newRouteHash = await safeMove(fromRoutePath, toRoutePath, {
       force: options.force,
       expectedHash: routeFileState?.hash,
-      acceptChanges: options.acceptChanges
+      acceptChanges: options.acceptChanges,
+      owner: normalizedFromRoute,
+      actualOwner: routeFileState?.owner
     });
     movedFiles.push({ from: fromRoutePath, to: toRoutePath });
     
@@ -194,15 +215,26 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       const toFeatureComponentName = getFeatureComponentName(normalizedToFeature);
       
       if (existsSync(fromFeaturePath)) {
-        await moveDirectory(fromFeaturePath, toFeaturePath, state, {
+        await moveDirectory(fromFeaturePath, toFeaturePath, state, config, {
           ...options,
           fromName: fromFeatureComponentName,
-          toName: toFeatureComponentName
+          toName: toFeatureComponentName,
+          owner: normalizedFromRoute
         });
         movedFiles.push({ from: fromFeaturePath, to: toFeaturePath });
         
         await cleanupEmptyDirs(path.dirname(fromFeaturePath), featuresRoot);
       }
+    }
+
+    if (options.scan && (normalizedFromFeature || normalizedToFeature)) {
+      await scanAndReplaceImports(config, state, {
+        fromFeaturePath: normalizedFromFeature,
+        fromComponentName: getFeatureComponentName(normalizedFromFeature)
+      }, {
+        toFeaturePath: normalizedToFeature || normalizedFromFeature,
+        toComponentName: getFeatureComponentName(normalizedToFeature || normalizedFromFeature)
+      }, options);
     }
     
     await cleanupEmptyDirs(path.dirname(fromRoutePath), pagesRoot);
@@ -231,12 +263,89 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     
   } catch (error) {
     console.error('Error:', error.message);
-    process.exit(1);
+    if (typeof process.exit === 'function' && process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+    throw error;
   }
 }
 
-async function moveDirectory(fromPath, toPath, state, options = {}) {
-  const { fromName, toName } = options;
+async function scanAndReplaceImports(config, state, fromInfo, toInfo, options) {
+  const { fromFeaturePath, fromComponentName } = fromInfo;
+  const { toFeaturePath, toComponentName } = toInfo;
+  
+  const allFiles = new Set();
+  const { scanDirectory, calculateHash } = await import('../utils/filesystem.js');
+  await scanDirectory(process.cwd(), allFiles);
+  
+  const featuresRoot = resolvePath(config, 'features');
+  
+  for (const relPath of allFiles) {
+    const fullPath = path.join(process.cwd(), relPath);
+    
+    // Skip the moved directory itself as it was already handled
+    if (fullPath.startsWith(path.resolve(toFeaturePath))) continue;
+
+    let content = await readFile(fullPath, 'utf-8');
+    let changed = false;
+
+    // Handle Aliases
+    if (config.importAliases.features) {
+      const oldAlias = `${config.importAliases.features}/${fromFeaturePath}`;
+      const newAlias = `${config.importAliases.features}/${toFeaturePath}`;
+      
+      // Update component name and path if both changed
+      const oldFullImport = `from '${oldAlias}/${fromComponentName}'`;
+      const newFullImport = `from '${newAlias}/${toComponentName}'`;
+      
+      if (content.includes(oldFullImport)) {
+        content = content.replace(new RegExp(oldFullImport.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newFullImport);
+        changed = true;
+      } else if (content.includes(oldAlias)) {
+        content = content.replace(new RegExp(oldAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newAlias);
+        changed = true;
+      }
+    } else {
+      // Handle Relative Imports (more complex)
+      // This is best-effort: we look for imports that resolve to the old feature path
+      const fromFeatureDir = secureJoin(featuresRoot, fromFeaturePath);
+      const toFeatureDir = secureJoin(featuresRoot, toFeaturePath);
+      
+      const oldRelPath = getRelativeImportPath(fullPath, fromFeatureDir);
+      const newRelPath = getRelativeImportPath(fullPath, toFeatureDir);
+      
+      const oldImport = `'${oldRelPath}/${fromComponentName}'`;
+      const newImport = `'${newRelPath}/${toComponentName}'`;
+      
+      if (content.includes(oldImport)) {
+        content = content.replace(new RegExp(oldImport.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newImport);
+        changed = true;
+      }
+    }
+
+    // Update component name in JSX and imports if it changed
+    if (fromComponentName !== toComponentName && changed) {
+       content = content.replace(new RegExp(`\\b${fromComponentName}\\b`, 'g'), toComponentName);
+    }
+
+    if (changed) {
+      if (options.dryRun) {
+        console.log(`  [Scan] Would update imports in ${relPath}`);
+      } else {
+        await writeFile(fullPath, content, 'utf-8');
+        console.log(`  [Scan] Updated imports in ${relPath}`);
+        
+        // Update state hash if this file is managed
+        if (state.files[relPath]) {
+          state.files[relPath].hash = calculateHash(content, config.hashing?.normalization);
+        }
+      }
+    }
+  }
+}
+
+async function moveDirectory(fromPath, toPath, state, config, options = {}) {
+  const { fromName, toName, owner = null } = options;
   
   if (!existsSync(fromPath)) {
     throw new Error(`Source directory not found: ${fromPath}`);
@@ -269,7 +378,7 @@ async function moveDirectory(fromPath, toPath, state, options = {}) {
     const stats = await stat(fromEntryPath);
     
     if (stats.isDirectory()) {
-      await moveDirectory(fromEntryPath, toEntryPath, state, options);
+      await moveDirectory(fromEntryPath, toEntryPath, state, config, options);
     } else {
       const normalizedFromRelative = path.relative(process.cwd(), fromEntryPath).replace(/\\/g, '/');
       const fileState = state.files[normalizedFromRelative];
@@ -277,7 +386,10 @@ async function moveDirectory(fromPath, toPath, state, options = {}) {
       const newHash = await safeMove(fromEntryPath, toEntryPath, {
         force: options.force,
         expectedHash: fileState?.hash,
-        acceptChanges: options.acceptChanges
+        acceptChanges: options.acceptChanges,
+        normalization: config.hashing?.normalization,
+        owner,
+        actualOwner: fileState?.owner
       });
       
       // Update internal content (signatures, component names) if renaming
@@ -303,7 +415,7 @@ async function moveDirectory(fromPath, toPath, state, options = {}) {
            await writeFile(toEntryPath, content, 'utf-8');
            // Re-calculate hash after content update
            const { calculateHash } = await import('../utils/filesystem.js');
-           const updatedHash = calculateHash(content);
+           const updatedHash = calculateHash(content, config.hashing?.normalization);
            
            const normalizedToRelative = path.relative(process.cwd(), toEntryPath).replace(/\\/g, '/');
            if (fileState) {

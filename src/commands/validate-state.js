@@ -1,11 +1,13 @@
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { loadConfig } from '../utils/config.js';
 import { loadState, saveState } from '../utils/state.js';
 import { calculateHash, isTextorGenerated } from '../utils/filesystem.js';
 
 export async function validateStateCommand(options) {
   try {
+    const config = await loadConfig();
     const state = await loadState();
     const results = {
       missing: [],
@@ -25,7 +27,7 @@ export async function validateStateCommand(options) {
       }
       
       const content = await readFile(fullPath, 'utf-8');
-      const currentHash = calculateHash(content);
+      const currentHash = calculateHash(content, config.hashing?.normalization);
       
       if (currentHash !== fileData.hash) {
         results.modified.push({

@@ -59,10 +59,17 @@
   "formatting": {
     "tool": "none"
   },
+  "hashing": {
+    "normalization": "normalizeEOL",
+    "useMarkers": false
+  },
   "git": {
     "requireCleanRepo": false,
     "stageChanges": false
   },
+  "kindRules": [
+    { "match": "src/features/custom/**", "kind": "custom-logic" }
+  ],
   "defaultPreset": "standard",
   "presets": {
     "minimal": {

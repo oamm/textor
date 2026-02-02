@@ -5,11 +5,17 @@ import {
   secureJoin 
 } from '../utils/filesystem.js';
 import { loadState, findComponent, saveState } from '../utils/state.js';
+import { isRepoClean } from '../utils/git.js';
 import path from 'path';
 
 export async function removeComponentCommand(identifier, options) {
   try {
     const config = await loadConfig();
+
+    if (config.git?.requireCleanRepo && !await isRepoClean()) {
+      throw new Error('Git repository is not clean. Please commit or stash your changes before proceeding.');
+    }
+
     const state = await loadState();
     
     const component = findComponent(state, identifier);
@@ -32,7 +38,9 @@ export async function removeComponentCommand(identifier, options) {
     const result = await safeDeleteDir(componentDir, {
       force: options.force,
       stateFiles: state.files,
-      acceptChanges: options.acceptChanges
+      acceptChanges: options.acceptChanges,
+      normalization: config.hashing?.normalization,
+      owner: identifier
     });
     
     if (result.deleted) {
@@ -57,6 +65,9 @@ export async function removeComponentCommand(identifier, options) {
     
   } catch (error) {
     console.error('Error:', error.message);
-    process.exit(1);
+    if (typeof process.exit === 'function' && process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+    throw error;
   }
 }

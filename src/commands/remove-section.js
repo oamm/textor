@@ -12,10 +12,16 @@ import {
   secureJoin 
 } from '../utils/filesystem.js';
 import { loadState, findSection, saveState } from '../utils/state.js';
+import { isRepoClean } from '../utils/git.js';
 
 export async function removeSectionCommand(route, featurePath, options) {
   try {
     const config = await loadConfig();
+
+    if (config.git?.requireCleanRepo && !await isRepoClean()) {
+      throw new Error('Git repository is not clean. Please commit or stash your changes before proceeding.');
+    }
+
     const state = await loadState();
     
     let targetRoute = route;
@@ -71,7 +77,10 @@ export async function removeSectionCommand(route, featurePath, options) {
       const result = await safeDelete(routeFilePath, {
         force: options.force,
         expectedHash: fileState?.hash,
-        acceptChanges: options.acceptChanges
+        acceptChanges: options.acceptChanges,
+        normalization: config.hashing?.normalization,
+        owner: normalizedRoute,
+        actualOwner: fileState?.owner
       });
       
       if (result.deleted) {
@@ -86,7 +95,9 @@ export async function removeSectionCommand(route, featurePath, options) {
       const result = await safeDeleteDir(featureDirPath, {
         force: options.force,
         stateFiles: state.files,
-        acceptChanges: options.acceptChanges
+        acceptChanges: options.acceptChanges,
+        normalization: config.hashing?.normalization,
+        owner: normalizedRoute
       });
       
       if (result.deleted) {
@@ -134,6 +145,9 @@ export async function removeSectionCommand(route, featurePath, options) {
     
   } catch (error) {
     console.error('Error:', error.message);
-    process.exit(1);
+    if (typeof process.exit === 'function' && process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+    throw error;
   }
 }

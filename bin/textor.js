@@ -9,6 +9,7 @@ import { createComponentCommand } from '../src/commands/create-component.js';
 import { removeComponentCommand } from '../src/commands/remove-component.js';
 import { listSectionsCommand } from '../src/commands/list-sections.js';
 import { validateStateCommand } from '../src/commands/validate-state.js';
+import { statusCommand } from '../src/commands/status.js';
 import { syncCommand } from '../src/commands/sync.js';
 import { adoptCommand } from '../src/commands/adopt.js';
 
@@ -104,6 +105,11 @@ program
   .command('list-sections')
   .description('List all Textor-managed sections')
   .action(listSectionsCommand);
+
+program
+  .command('status')
+  .description('Show drift between state and disk')
+  .action(statusCommand);
 
 program
   .command('validate-state')

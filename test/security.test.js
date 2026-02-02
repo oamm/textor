@@ -33,24 +33,16 @@ describe('Security', () => {
   });
 
   it('should not allow creating sections outside of pages directory', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
     const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     
-    try {
-      await addSectionCommand('/../../traversal', 'Traversal', { layout: 'Main' });
-    } catch (error) {
-      if (error.message !== 'process.exit called') throw error;
-    }
+    await expect(addSectionCommand('/../../traversal', 'Traversal', { layout: 'Main' }))
+      .rejects.toThrow('Security error: Path traversal attempt detected');
     
     expect(logSpy).toHaveBeenCalledWith('Error:', expect.stringContaining('Path traversal attempt detected'));
-    expect(exitSpy).toHaveBeenCalledWith(1);
     
     const outsideFile = path.resolve(TEST_DIR, 'traversal.astro');
     expect(existsSync(outsideFile)).toBe(false);
     
-    exitSpy.mockRestore();
     logSpy.mockRestore();
   });
 

@@ -49,7 +49,7 @@ export async function syncCommand(options) {
       managedFiles.delete(relativePath); // Remove from managedFiles so we don't process it again in step 2
 
       const content = await readFile(fullPath, 'utf-8');
-      const currentHash = calculateHash(content);
+      const currentHash = calculateHash(content, config.hashing?.normalization);
       const fileData = state.files[relativePath];
 
       if (currentHash !== fileData.hash) {
@@ -70,7 +70,7 @@ export async function syncCommand(options) {
       
       if (isGenerated || options.includeAll) {
         const content = await readFile(fullPath, 'utf-8');
-        const hash = calculateHash(content);
+        const hash = calculateHash(content, config.hashing?.normalization);
         results.added.push({ path: relativePath, hash });
       } else {
         ignoredCount++;

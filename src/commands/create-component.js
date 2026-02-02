@@ -8,6 +8,7 @@ import {
 import { 
   ensureNotExists, 
   writeFileWithSignature,
+  getSignature,
   ensureDir,
   secureJoin,
   formatFiles 
@@ -28,6 +29,7 @@ import {
   generateStoriesTemplate
 } from '../utils/templates.js';
 import { addComponentToState, registerFile } from '../utils/state.js';
+import { stageFiles } from '../utils/git.js';
 
 export async function createComponentCommand(componentName, options) {
   try {
@@ -130,16 +132,20 @@ export async function createComponentCommand(componentName, options) {
     if (shouldCreateSchemas) await ensureDir(schemasDirInside);
     
     const componentContent = generateComponentTemplate(normalizedName, framework);
-    const signature = config.naming.componentExtension === '.astro' 
-      ? config.signatures.astro 
-      : (config.signatures.tsx || config.signatures.typescript);
+    const signature = getSignature(config, config.naming.componentExtension === '.astro' ? 'astro' : 'tsx');
 
     const componentHash = await writeFileWithSignature(
       componentFilePath,
       componentContent,
-      signature
+      signature,
+      config.hashing?.normalization
     );
-    await registerFile(componentFilePath, { kind: 'component', template: 'component', hash: componentHash });
+    await registerFile(componentFilePath, { 
+      kind: 'component', 
+      template: 'component', 
+      hash: componentHash,
+      owner: normalizedName 
+    });
     
     const writtenFiles = [componentFilePath];
 
@@ -147,9 +153,15 @@ export async function createComponentCommand(componentName, options) {
     const indexHash = await writeFileWithSignature(
       indexFilePath,
       indexContent,
-      config.signatures.typescript
+      getSignature(config, 'typescript'),
+      config.hashing?.normalization
     );
-    await registerFile(indexFilePath, { kind: 'component-file', template: 'index', hash: indexHash });
+    await registerFile(indexFilePath, { 
+      kind: 'component-file', 
+      template: 'index', 
+      hash: indexHash,
+      owner: normalizedName 
+    });
     writtenFiles.push(indexFilePath);
     
     if (shouldCreateTypes) {
@@ -157,9 +169,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         typesFilePath,
         typesContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(typesFilePath, { kind: 'component-file', template: 'types', hash });
+      await registerFile(typesFilePath, { 
+        kind: 'component-file', 
+        template: 'types', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(typesFilePath);
     }
     
@@ -168,9 +186,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         contextFilePath,
         contextContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(contextFilePath, { kind: 'component-file', template: 'context', hash });
+      await registerFile(contextFilePath, { 
+        kind: 'component-file', 
+        template: 'context', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(contextFilePath);
     }
     
@@ -180,9 +204,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         hookFilePath,
         hookContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(hookFilePath, { kind: 'component-file', template: 'hook', hash });
+      await registerFile(hookFilePath, { 
+        kind: 'component-file', 
+        template: 'hook', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(hookFilePath);
     }
     
@@ -192,9 +222,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         testFilePath,
         testContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(testFilePath, { kind: 'component-file', template: 'test', hash });
+      await registerFile(testFilePath, { 
+        kind: 'component-file', 
+        template: 'test', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(testFilePath);
     }
     
@@ -203,9 +239,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         configFilePath,
         configContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(configFilePath, { kind: 'component-file', template: 'config', hash });
+      await registerFile(configFilePath, { 
+        kind: 'component-file', 
+        template: 'config', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(configFilePath);
     }
     
@@ -214,9 +256,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         constantsFilePath,
         constantsContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(constantsFilePath, { kind: 'component-file', template: 'constants', hash });
+      await registerFile(constantsFilePath, { 
+        kind: 'component-file', 
+        template: 'constants', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(constantsFilePath);
     }
 
@@ -225,9 +273,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         apiFilePath,
         apiContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(apiFilePath, { kind: 'component-file', template: 'api', hash });
+      await registerFile(apiFilePath, { 
+        kind: 'component-file', 
+        template: 'api', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(apiFilePath);
     }
 
@@ -236,9 +290,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         servicesFilePath,
         servicesContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(servicesFilePath, { kind: 'component-file', template: 'service', hash });
+      await registerFile(servicesFilePath, { 
+        kind: 'component-file', 
+        template: 'service', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(servicesFilePath);
     }
 
@@ -247,9 +307,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         schemasFilePath,
         schemasContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(schemasFilePath, { kind: 'component-file', template: 'schema', hash });
+      await registerFile(schemasFilePath, { 
+        kind: 'component-file', 
+        template: 'schema', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(schemasFilePath);
     }
 
@@ -258,9 +324,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         readmeFilePath,
         readmeContent,
-        config.signatures.astro
+        getSignature(config, 'astro'),
+        config.hashing?.normalization
       );
-      await registerFile(readmeFilePath, { kind: 'component-file', template: 'readme', hash });
+      await registerFile(readmeFilePath, { 
+        kind: 'component-file', 
+        template: 'readme', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(readmeFilePath);
     }
 
@@ -270,9 +342,15 @@ export async function createComponentCommand(componentName, options) {
       const hash = await writeFileWithSignature(
         storiesFilePath,
         storiesContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(storiesFilePath, { kind: 'component-file', template: 'stories', hash });
+      await registerFile(storiesFilePath, { 
+        kind: 'component-file', 
+        template: 'stories', 
+        hash,
+        owner: normalizedName 
+      });
       writtenFiles.push(storiesFilePath);
     }
     
@@ -302,9 +380,16 @@ export async function createComponentCommand(componentName, options) {
       name: normalizedName,
       path: componentDir
     });
+
+    if (config.git?.stageChanges) {
+      await stageFiles(writtenFiles);
+    }
     
   } catch (error) {
     console.error('Error:', error.message);
-    process.exit(1);
+    if (typeof process.exit === 'function' && process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+    throw error;
   }
 }

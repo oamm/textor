@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, rename, open } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
@@ -25,16 +25,32 @@ export async function loadState() {
   }
 }
 
+let saveQueue = Promise.resolve();
+
 export async function saveState(state) {
-  const statePath = getStatePath();
-  const dir = path.dirname(statePath);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
+  const result = saveQueue.then(async () => {
+    const statePath = getStatePath();
+    const dir = path.dirname(statePath);
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
+    }
+    
+    const tempPath = statePath + '.' + Math.random().toString(36).slice(2) + '.tmp';
+    const content = JSON.stringify(state, null, 2);
+    
+    const handle = await open(tempPath, 'w');
+    await handle.writeFile(content, 'utf-8');
+    await handle.sync();
+    await handle.close();
+
+    await rename(tempPath, statePath);
+  });
+  
+  saveQueue = result.catch(() => {});
+  return result;
 }
 
-export async function registerFile(filePath, { kind, template, hash }) {
+export async function registerFile(filePath, { kind, template, hash, templateVersion = '1.0.0', owner = null }) {
   const state = await loadState();
   const normalizedPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
   
@@ -42,6 +58,8 @@ export async function registerFile(filePath, { kind, template, hash }) {
     kind,
     template,
     hash,
+    templateVersion,
+    owner,
     timestamp: new Date().toISOString()
   };
   

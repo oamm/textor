@@ -114,10 +114,15 @@ export const DEFAULT_CONFIG = {
   formatting: {
     tool: 'none' // 'prettier' | 'biome' | 'none'
   },
+  hashing: {
+    normalization: 'normalizeEOL', // 'none' | 'normalizeEOL' | 'stripGeneratedRegions'
+    useMarkers: false
+  },
   git: {
     requireCleanRepo: false,
     stageChanges: false
   },
+  kindRules: [],
   presets: {
     minimal: {
       features: {
@@ -301,6 +306,10 @@ function validateConfig(config) {
     if (!config[section] || typeof config[section] !== 'object') {
       throw new Error(`Invalid configuration: missing or invalid "${section}" section`);
     }
+  }
+
+  if (config.kindRules && !Array.isArray(config.kindRules)) {
+    throw new Error('Invalid configuration: "kindRules" must be an array');
   }
 
   // Validate paths are strings

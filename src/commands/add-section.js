@@ -13,6 +13,7 @@ import {
 import { 
   ensureNotExists, 
   writeFileWithSignature,
+  getSignature,
   ensureDir,
   secureJoin,
   formatFiles
@@ -34,6 +35,7 @@ import {
   generateStoriesTemplate
 } from '../utils/templates.js';
 import { addSectionToState, registerFile } from '../utils/state.js';
+import { stageFiles } from '../utils/git.js';
 
 export async function addSectionCommand(route, featurePath, options) {
   try {
@@ -168,7 +170,7 @@ export async function addSectionCommand(route, featurePath, options) {
     
     if (options.endpoint) {
       routeContent = generateEndpointTemplate(featureComponentName);
-      routeSignature = config.signatures.typescript;
+      routeSignature = getSignature(config, 'typescript');
     } else {
       routeContent = generateRouteTemplate(
         options.layout,
@@ -176,7 +178,7 @@ export async function addSectionCommand(route, featurePath, options) {
         featureImportPath,
         featureComponentName
       );
-      routeSignature = config.signatures.astro;
+      routeSignature = getSignature(config, 'astro');
     }
     
     const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath, framework);
@@ -184,9 +186,15 @@ export async function addSectionCommand(route, featurePath, options) {
     const routeHash = await writeFileWithSignature(
       routeFilePath,
       routeContent,
-      routeSignature
+      routeSignature,
+      config.hashing?.normalization
     );
-    await registerFile(routeFilePath, { kind: 'route', template: options.endpoint ? 'endpoint' : 'route', hash: routeHash });
+    await registerFile(routeFilePath, { 
+      kind: 'route', 
+      template: options.endpoint ? 'endpoint' : 'route', 
+      hash: routeHash,
+      owner: normalizedRoute 
+    });
     
     const writtenFiles = [routeFilePath];
 
@@ -201,25 +209,35 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateTests) await ensureDir(testsDir);
     if (shouldCreateTypes) await ensureDir(typesDirInside);
 
-    const featureSignature = config.naming.featureExtension === '.astro'
-      ? config.signatures.astro
-      : (config.signatures.tsx || config.signatures.typescript);
+    const featureSignature = getSignature(config, config.naming.featureExtension === '.astro' ? 'astro' : 'tsx');
 
     const featureHash = await writeFileWithSignature(
       featureFilePath,
       featureContent,
-      featureSignature
+      featureSignature,
+      config.hashing?.normalization
     );
-    await registerFile(featureFilePath, { kind: 'feature', template: 'feature', hash: featureHash });
+    await registerFile(featureFilePath, { 
+      kind: 'feature', 
+      template: 'feature', 
+      hash: featureHash,
+      owner: normalizedRoute 
+    });
     writtenFiles.push(featureFilePath);
 
     if (shouldCreateScriptsDir) {
       const hash = await writeFileWithSignature(
         scriptsIndexPath,
         generateScriptsIndexTemplate(),
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(scriptsIndexPath, { kind: 'feature-file', template: 'scripts-index', hash });
+      await registerFile(scriptsIndexPath, { 
+        kind: 'feature-file', 
+        template: 'scripts-index', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(scriptsIndexPath);
     }
 
@@ -228,75 +246,171 @@ export async function addSectionCommand(route, featurePath, options) {
       const hash = await writeFileWithSignature(
         indexFilePath,
         indexContent,
-        config.signatures.typescript
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
       );
-      await registerFile(indexFilePath, { kind: 'feature-file', template: 'index', hash });
+      await registerFile(indexFilePath, { 
+        kind: 'feature-file', 
+        template: 'index', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(indexFilePath);
     }
 
     if (shouldCreateApi) {
       const apiContent = generateApiTemplate(featureComponentName);
-      const hash = await writeFileWithSignature(apiFilePath, apiContent, config.signatures.typescript);
-      await registerFile(apiFilePath, { kind: 'feature-file', template: 'api', hash });
+      const hash = await writeFileWithSignature(
+        apiFilePath, 
+        apiContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(apiFilePath, { 
+        kind: 'feature-file', 
+        template: 'api', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(apiFilePath);
     }
 
     if (shouldCreateServices) {
       const servicesContent = generateServiceTemplate(featureComponentName);
-      const hash = await writeFileWithSignature(servicesFilePath, servicesContent, config.signatures.typescript);
-      await registerFile(servicesFilePath, { kind: 'feature-file', template: 'service', hash });
+      const hash = await writeFileWithSignature(
+        servicesFilePath, 
+        servicesContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(servicesFilePath, { 
+        kind: 'feature-file', 
+        template: 'service', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(servicesFilePath);
     }
 
     if (shouldCreateSchemas) {
       const schemasContent = generateSchemaTemplate(featureComponentName);
-      const hash = await writeFileWithSignature(schemasFilePath, schemasContent, config.signatures.typescript);
-      await registerFile(schemasFilePath, { kind: 'feature-file', template: 'schema', hash });
+      const hash = await writeFileWithSignature(
+        schemasFilePath, 
+        schemasContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(schemasFilePath, { 
+        kind: 'feature-file', 
+        template: 'schema', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(schemasFilePath);
     }
 
     if (shouldCreateHooks) {
       const hookName = getHookFunctionName(featureComponentName);
       const hookContent = generateHookTemplate(featureComponentName, hookName);
-      const hash = await writeFileWithSignature(hookFilePath, hookContent, config.signatures.typescript);
-      await registerFile(hookFilePath, { kind: 'feature-file', template: 'hook', hash });
+      const hash = await writeFileWithSignature(
+        hookFilePath, 
+        hookContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(hookFilePath, { 
+        kind: 'feature-file', 
+        template: 'hook', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(hookFilePath);
     }
 
     if (shouldCreateContext) {
       const contextContent = generateContextTemplate(featureComponentName);
-      const hash = await writeFileWithSignature(contextFilePath, contextContent, config.signatures.typescript);
-      await registerFile(contextFilePath, { kind: 'feature-file', template: 'context', hash });
+      const hash = await writeFileWithSignature(
+        contextFilePath, 
+        contextContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(contextFilePath, { 
+        kind: 'feature-file', 
+        template: 'context', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(contextFilePath);
     }
 
     if (shouldCreateTests) {
       const relativeFeaturePath = `./${path.basename(featureFilePath)}`;
       const testContent = generateTestTemplate(featureComponentName, relativeFeaturePath);
-      const hash = await writeFileWithSignature(testFilePath, testContent, config.signatures.typescript);
-      await registerFile(testFilePath, { kind: 'feature-file', template: 'test', hash });
+      const hash = await writeFileWithSignature(
+        testFilePath, 
+        testContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(testFilePath, { 
+        kind: 'feature-file', 
+        template: 'test', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(testFilePath);
     }
 
     if (shouldCreateTypes) {
       const typesContent = generateTypesTemplate(featureComponentName);
-      const hash = await writeFileWithSignature(typesFilePath, typesContent, config.signatures.typescript);
-      await registerFile(typesFilePath, { kind: 'feature-file', template: 'types', hash });
+      const hash = await writeFileWithSignature(
+        typesFilePath, 
+        typesContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(typesFilePath, { 
+        kind: 'feature-file', 
+        template: 'types', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(typesFilePath);
     }
 
     if (shouldCreateReadme) {
       const readmeContent = generateReadmeTemplate(featureComponentName);
-      const hash = await writeFileWithSignature(readmeFilePath, readmeContent, config.signatures.astro);
-      await registerFile(readmeFilePath, { kind: 'feature-file', template: 'readme', hash });
+      const hash = await writeFileWithSignature(
+        readmeFilePath, 
+        readmeContent, 
+        getSignature(config, 'astro'),
+        config.hashing?.normalization
+      );
+      await registerFile(readmeFilePath, { 
+        kind: 'feature-file', 
+        template: 'readme', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(readmeFilePath);
     }
 
     if (shouldCreateStories) {
       const relativePath = `./${path.basename(featureFilePath)}`;
       const storiesContent = generateStoriesTemplate(featureComponentName, relativePath);
-      const hash = await writeFileWithSignature(storiesFilePath, storiesContent, config.signatures.typescript);
-      await registerFile(storiesFilePath, { kind: 'feature-file', template: 'stories', hash });
+      const hash = await writeFileWithSignature(
+        storiesFilePath, 
+        storiesContent, 
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(storiesFilePath, { 
+        kind: 'feature-file', 
+        template: 'stories', 
+        hash,
+        owner: normalizedRoute 
+      });
       writtenFiles.push(storiesFilePath);
     }
     
@@ -329,9 +443,16 @@ export async function addSectionCommand(route, featurePath, options) {
       layout: options.layout,
       extension: routeExtension
     });
+
+    if (config.git?.stageChanges) {
+      await stageFiles(writtenFiles);
+    }
     
   } catch (error) {
     console.error('Error:', error.message);
-    process.exit(1);
+    if (typeof process.exit === 'function' && process.env.NODE_ENV !== 'test') {
+      process.exit(1);
+    }
+    throw error;
   }
 }

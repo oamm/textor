@@ -135,7 +135,7 @@ async function adoptFile(relPath, config, state, options) {
   }
 
   if (!options.dryRun) {
-    const hash = calculateHash(finalContent);
+    const hash = calculateHash(finalContent, config.hashing?.normalization);
     state.files[relPath] = {
       kind: inferKind(relPath, config),
       hash: hash,

@@ -2,7 +2,7 @@ import path from 'path';
 
 export function toPascalCase(input) {
   return input
-    .split(/[/_-]/)
+    .split(/[/\\_-]/)
     .filter(Boolean)
     .map(segment => {
       if (segment === segment.toUpperCase() && segment.length > 1) {
