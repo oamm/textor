@@ -80,8 +80,11 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
     
-    const fromRouteFile = routeToFilePath(normalizedFromRoute, config.naming.routeExtension);
-    const toRouteFile = routeToFilePath(normalizedToRoute, config.naming.routeExtension);
+    const fromSection = findSection(state, actualFromRoute);
+    const routeExtension = (fromSection && fromSection.extension) || config.naming.routeExtension;
+    
+    const fromRouteFile = routeToFilePath(normalizedFromRoute, routeExtension);
+    const toRouteFile = routeToFilePath(normalizedToRoute, routeExtension);
     
     const fromRoutePath = secureJoin(pagesRoot, fromRouteFile);
     const toRoutePath = secureJoin(pagesRoot, toRouteFile);
@@ -186,7 +189,8 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
         name: existingSection ? existingSection.name : getFeatureComponentName(normalizedToFeature || normalizedFromFeature),
         route: normalizedToRoute,
         featurePath: normalizedToFeature || normalizedFromFeature,
-        layout: existingSection ? existingSection.layout : 'Main'
+        layout: existingSection ? existingSection.layout : 'Main',
+        extension: routeExtension
       });
     }
     

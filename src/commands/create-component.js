@@ -19,7 +19,12 @@ import {
   generateConfigTemplate,
   generateConstantsTemplate,
   generateIndexTemplate,
-  generateTypesTemplate
+  generateTypesTemplate,
+  generateApiTemplate,
+  generateServiceTemplate,
+  generateSchemaTemplate,
+  generateReadmeTemplate,
+  generateStoriesTemplate
 } from '../utils/templates.js';
 import { addComponentToState } from '../utils/state.js';
 
@@ -39,16 +44,24 @@ export async function createComponentCommand(componentName, options) {
     const contextDirInside = secureJoin(componentDir, 'context');
     const hooksDirInside = secureJoin(componentDir, 'hooks');
     const typesDirInside = secureJoin(componentDir, 'types');
+    const apiDirInside = secureJoin(componentDir, 'api');
+    const servicesDirInside = secureJoin(componentDir, 'services');
+    const schemasDirInside = secureJoin(componentDir, 'schemas');
     
     const createdFiles = [];
     
-    const shouldCreateContext = options.context !== false && config.components.createContext;
-    const shouldCreateHook = options.hook !== false && config.components.createHook;
-    const shouldCreateTests = options.tests !== false && config.components.createTests;
-    const shouldCreateConfig = options.config !== false && config.components.createConfig;
-    const shouldCreateConstants = options.constants !== false && config.components.createConstants;
-    const shouldCreateTypes = config.components.createTypes;
-    const shouldCreateSubComponentsDir = options.subComponentsDir !== false && config.components.createSubComponentsDir;
+    const shouldCreateContext = options.context !== undefined ? options.context : config.components.createContext;
+    const shouldCreateHook = options.hook !== undefined ? options.hook : config.components.createHook;
+    const shouldCreateTests = options.tests !== undefined ? options.tests : config.components.createTests;
+    const shouldCreateConfig = options.config !== undefined ? options.config : config.components.createConfig;
+    const shouldCreateConstants = options.constants !== undefined ? options.constants : config.components.createConstants;
+    const shouldCreateTypes = options.types !== undefined ? options.types : config.components.createTypes;
+    const shouldCreateSubComponentsDir = options.subComponentsDir !== undefined ? options.subComponentsDir : config.components.createSubComponentsDir;
+    const shouldCreateApi = options.api !== undefined ? options.api : config.components.createApi;
+    const shouldCreateServices = options.services !== undefined ? options.services : config.components.createServices;
+    const shouldCreateSchemas = options.schemas !== undefined ? options.schemas : config.components.createSchemas;
+    const shouldCreateReadme = options.readme !== undefined ? options.readme : config.components.createReadme;
+    const shouldCreateStories = options.stories !== undefined ? options.stories : config.components.createStories;
     
     const componentFilePath = path.join(componentDir, `${normalizedName}${config.naming.componentExtension}`);
     const indexFilePath = path.join(componentDir, 'index.ts');
@@ -58,6 +71,11 @@ export async function createComponentCommand(componentName, options) {
     const configFilePath = path.join(configDirInside, 'index.ts');
     const constantsFilePath = path.join(constantsDirInside, 'index.ts');
     const typesFilePath = path.join(typesDirInside, 'index.ts');
+    const apiFilePath = path.join(apiDirInside, 'index.ts');
+    const servicesFilePath = path.join(servicesDirInside, 'index.ts');
+    const schemasFilePath = path.join(schemasDirInside, 'index.ts');
+    const readmeFilePath = path.join(componentDir, 'README.md');
+    const storiesFilePath = path.join(componentDir, `${normalizedName}.stories.tsx`);
     
     if (options.dryRun) {
       console.log('Dry run - would create:');
@@ -70,6 +88,11 @@ export async function createComponentCommand(componentName, options) {
       if (shouldCreateConfig) console.log(`  Config: ${configFilePath}`);
       if (shouldCreateConstants) console.log(`  Constants: ${constantsFilePath}`);
       if (shouldCreateTypes) console.log(`  Types: ${typesFilePath}`);
+      if (shouldCreateApi) console.log(`  Api: ${apiFilePath}`);
+      if (shouldCreateServices) console.log(`  Services: ${servicesFilePath}`);
+      if (shouldCreateSchemas) console.log(`  Schemas: ${schemasFilePath}`);
+      if (shouldCreateReadme) console.log(`  Readme: ${readmeFilePath}`);
+      if (shouldCreateStories) console.log(`  Stories: ${storiesFilePath}`);
       if (shouldCreateSubComponentsDir) console.log(`  Sub-components: ${subComponentsDir}/`);
       
       return;
@@ -84,6 +107,11 @@ export async function createComponentCommand(componentName, options) {
     if (shouldCreateConfig) await ensureNotExists(configFilePath, options.force);
     if (shouldCreateConstants) await ensureNotExists(constantsFilePath, options.force);
     if (shouldCreateTypes) await ensureNotExists(typesFilePath, options.force);
+    if (shouldCreateApi) await ensureNotExists(apiFilePath, options.force);
+    if (shouldCreateServices) await ensureNotExists(servicesFilePath, options.force);
+    if (shouldCreateSchemas) await ensureNotExists(schemasFilePath, options.force);
+    if (shouldCreateReadme) await ensureNotExists(readmeFilePath, options.force);
+    if (shouldCreateStories) await ensureNotExists(storiesFilePath, options.force);
     
     await ensureDir(componentDir);
     
@@ -94,6 +122,9 @@ export async function createComponentCommand(componentName, options) {
     if (shouldCreateConfig) await ensureDir(configDirInside);
     if (shouldCreateConstants) await ensureDir(constantsDirInside);
     if (shouldCreateTypes) await ensureDir(typesDirInside);
+    if (shouldCreateApi) await ensureDir(apiDirInside);
+    if (shouldCreateServices) await ensureDir(servicesDirInside);
+    if (shouldCreateSchemas) await ensureDir(schemasDirInside);
     
     const componentContent = generateComponentTemplate(normalizedName);
     await writeFileWithSignature(
@@ -171,6 +202,57 @@ export async function createComponentCommand(componentName, options) {
         config.signatures.typescript
       );
       createdFiles.push(constantsFilePath);
+    }
+
+    if (shouldCreateApi) {
+      const apiContent = generateApiTemplate(normalizedName);
+      await writeFileWithSignature(
+        apiFilePath,
+        apiContent,
+        config.signatures.typescript
+      );
+      createdFiles.push(apiFilePath);
+    }
+
+    if (shouldCreateServices) {
+      const servicesContent = generateServiceTemplate(normalizedName);
+      await writeFileWithSignature(
+        servicesFilePath,
+        servicesContent,
+        config.signatures.typescript
+      );
+      createdFiles.push(servicesFilePath);
+    }
+
+    if (shouldCreateSchemas) {
+      const schemasContent = generateSchemaTemplate(normalizedName);
+      await writeFileWithSignature(
+        schemasFilePath,
+        schemasContent,
+        config.signatures.typescript
+      );
+      createdFiles.push(schemasFilePath);
+    }
+
+    if (shouldCreateReadme) {
+      const readmeContent = generateReadmeTemplate(normalizedName);
+      await writeFileWithSignature(
+        readmeFilePath,
+        readmeContent,
+        config.signatures.astro
+      );
+      createdFiles.push(readmeFilePath);
+    }
+
+    if (shouldCreateStories) {
+      const relativePath = `./${normalizedName}${config.naming.componentExtension}`;
+      const storiesContent = generateStoriesTemplate(normalizedName, relativePath);
+      await writeFileWithSignature(
+        storiesFilePath,
+        storiesContent,
+        config.signatures.typescript
+      );
+      createdFiles.push(storiesFilePath);
     }
     
     console.log('✓ Component created successfully:');

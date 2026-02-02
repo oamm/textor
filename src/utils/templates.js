@@ -50,6 +50,9 @@ export function generateFeatureTemplate(componentName, scriptImportPath) {
 }
 
 export function generateScriptsIndexTemplate() {
+  const override = getTemplateOverride('scripts-index');
+  if (override) return override;
+
   return `export {};
 `;
 }
@@ -141,6 +144,9 @@ describe('${componentName}', () => {
 }
 
 export function generateConfigTemplate(componentName) {
+  const override = getTemplateOverride('config', { componentName });
+  if (override) return override;
+
   return `export const ${componentName}Config = {
   // Add configuration here
 };
@@ -148,6 +154,9 @@ export function generateConfigTemplate(componentName) {
 }
 
 export function generateConstantsTemplate(componentName) {
+  const override = getTemplateOverride('constants', { componentName });
+  if (override) return override;
+
   return `export const ${componentName.toUpperCase()}_CONSTANTS = {
   // Add constants here
 };
@@ -155,14 +164,111 @@ export function generateConstantsTemplate(componentName) {
 }
 
 export function generateIndexTemplate(componentName, componentExtension) {
+  const override = getTemplateOverride('index', { componentName, componentExtension });
+  if (override) return override;
+
   return `export { default as ${componentName} } from './${componentName}${componentExtension}';
 export * from './types';
 `;
 }
 
 export function generateTypesTemplate(componentName) {
+  const override = getTemplateOverride('types', { componentName });
+  if (override) return override;
+
   return `export type ${componentName}Props = {
   // Add props types here
+};
+`;
+}
+
+export function generateApiTemplate(componentName) {
+  const override = getTemplateOverride('api', { componentName });
+  if (override) return override;
+
+  return `export function GET({ params, request }) {
+  return new Response(
+    JSON.stringify({
+      name: "${componentName}",
+      url: "https://astro.build/",
+    }),
+  );
+}
+`;
+}
+
+export function generateEndpointTemplate(componentName) {
+  const override = getTemplateOverride('endpoint', { componentName });
+  if (override) return override;
+
+  return `export function GET({ params, request }) {
+  return new Response(
+    JSON.stringify({
+      name: "${componentName}",
+      url: "https://astro.build/",
+    }),
+  );
+}
+`;
+}
+
+export function generateServiceTemplate(componentName) {
+  const override = getTemplateOverride('service', { componentName });
+  if (override) return override;
+
+  return `// ${componentName} business logic and transformers
+export function format${componentName}Data(data: any) {
+  return data;
+}
+`;
+}
+
+export function generateSchemaTemplate(componentName) {
+  const override = getTemplateOverride('schema', { componentName });
+  if (override) return override;
+
+  return `// ${componentName} validation schemas
+// import { z } from 'zod';
+
+// export const ${componentName}Schema = z.object({
+//   id: z.string(),
+// });
+`;
+}
+
+export function generateReadmeTemplate(componentName) {
+  const override = getTemplateOverride('readme', { componentName });
+  if (override) return override;
+
+  return `# ${componentName}
+
+## Description
+Brief description of what this feature/component does.
+
+## Props/Usage
+How to use this and what are its requirements.
+`;
+}
+
+export function generateStoriesTemplate(componentName, componentPath) {
+  const override = getTemplateOverride('stories', { componentName, componentPath });
+  if (override) return override;
+
+  return `import type { Meta, StoryObj } from '@storybook/react';
+import ${componentName} from '${componentPath}';
+
+const meta: Meta<typeof ${componentName}> = {
+  title: 'Components/${componentName}',
+  component: ${componentName},
+};
+
+export default meta;
+type Story = StoryObj<typeof ${componentName}>;
+
+export const Default: Story = {
+  args: {
+    // Default props
+  },
 };
 `;
 }

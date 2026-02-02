@@ -131,6 +131,44 @@ pnpm textor remove-section /users
 
 Only deletes files with Textor signature unless `--force` is used.
 
+## Senior Level Architecture
+
+For enterprise-scale projects, Textor supports a robust nested directory structure for both features and components.
+
+### Senior Feature Structure
+```bash
+pnpm textor add-section /users users/dashboard --api --services --schemas --tests --readme --stories
+```
+
+**Creates:**
+```text
+src/features/users/dashboard/
+├── api/                # External data fetching
+├── services/           # Data transformers/formatting
+├── schemas/            # Data validation (Zod/Valibot)
+├── hooks/              # State management/side effects
+├── sub-components/     # UI pieces used only by this feature
+├── types/              # TS definitions
+├── __tests__/          # Integration tests
+├── Dashboard.astro     # Main entry (View)
+├── README.md           # Documentation
+└── Dashboard.stories.tsx # Storybook stories
+```
+
+### Options
+
+Both `add-section` and `create-component` support these architectural options:
+
+- `--api`: Create `api/` directory with a boilerplate service.
+- `--services`: Create `services/` directory for business logic.
+- `--schemas`: Create `schemas/` directory for validation (Zod, etc.).
+- `--readme`: Create `README.md` for documentation.
+- `--stories`: Create `<Name>.stories.tsx` for Storybook.
+- `--tests`: Create `__tests__/` directory.
+- `--hooks`: Create `hooks/` directory (for features).
+- `--context`: Create `context/` directory (for features).
+- `--types`: Create `types/` directory.
+
 ## Commands
 
 ### `init`
@@ -152,6 +190,19 @@ pnpm textor add-section <route> <featurePath> [options]
 **Options:**
 - `--layout <name>` - Layout component name (default: "Main")
 - `--name <name>` - Custom name for the section (for easier tracking)
+- `--endpoint` - Create an API endpoint (.ts) instead of an Astro page
+- `--api` - Create api directory
+- `--services` - Create services directory
+- `--schemas` - Create schemas directory
+- `--hooks` - Create hooks directory
+- `--context` - Create context directory
+- `--tests` - Create tests directory
+- `--types` - Create types directory
+- `--readme` - Create README.md
+- `--stories` - Create Storybook stories
+- `--index` - Create index.ts entry point
+- `--no-sub-components-dir` - Skip creating sub-components directory
+- `--no-scripts-dir` - Skip creating scripts directory
 - `--dry-run` - Preview without creating
 - `--force` - Overwrite existing files
 
@@ -333,6 +384,16 @@ Supported templates:
 - `hook.astro`: Template for component hooks
 - `context.astro`: Template for component context providers
 - `test.astro`: Template for component tests
+- `api.astro`: Template for API service layers
+- `service.astro`: Template for business logic/data transformers
+- `schema.astro`: Template for validation schemas (Zod, etc.)
+- `readme.astro`: Template for README.md documentation
+- `stories.astro`: Template for Storybook stories
+- `config.astro`: Template for component configuration
+- `constants.astro`: Template for component constants
+- `index.astro`: Template for public entry points
+- `types.astro`: Template for TypeScript definitions
+- `scripts-index.astro`: Template for feature client-side logic entry
 
 Templates use `{{variable}}` syntax for dynamic values.
 

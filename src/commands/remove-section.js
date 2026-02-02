@@ -21,9 +21,9 @@ export async function removeSectionCommand(route, featurePath, options) {
     
     let targetRoute = route;
     let targetFeaturePath = featurePath;
+    let section = findSection(state, route);
 
     if (!targetFeaturePath) {
-      const section = findSection(state, route);
       if (section) {
         targetRoute = section.route;
         targetFeaturePath = section.featurePath;
@@ -35,7 +35,8 @@ export async function removeSectionCommand(route, featurePath, options) {
     const normalizedRoute = normalizeRoute(targetRoute);
     const normalizedFeaturePath = featureToDirectoryPath(targetFeaturePath);
     
-    const routeFileName = routeToFilePath(normalizedRoute, config.naming.routeExtension);
+    const routeExtension = (section && section.extension) || config.naming.routeExtension;
+    const routeFileName = routeToFilePath(normalizedRoute, routeExtension);
     const featureFileName = getFeatureFileName(normalizedFeaturePath, config.naming.featureExtension);
     
     const pagesRoot = resolvePath(config, 'pages');

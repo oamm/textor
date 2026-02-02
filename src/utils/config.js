@@ -66,7 +66,17 @@ export const DEFAULT_CONFIG = {
   features: {
     createSubComponentsDir: true,
     createScriptsDir: true,
-    scriptsIndexFile: 'scripts/index.ts'
+    scriptsIndexFile: 'scripts/index.ts',
+    createApi: false,
+    createServices: false,
+    createSchemas: false,
+    createHooks: false,
+    createContext: false,
+    createTests: false,
+    createTypes: false,
+    createReadme: false,
+    createStories: false,
+    createIndex: false
   },
   components: {
     createSubComponentsDir: true,
@@ -75,7 +85,12 @@ export const DEFAULT_CONFIG = {
     createTests: true,
     createConfig: true,
     createConstants: true,
-    createTypes: true
+    createTypes: true,
+    createApi: false,
+    createServices: false,
+    createSchemas: false,
+    createReadme: false,
+    createStories: false
   }
 };
 
