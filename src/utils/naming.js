@@ -52,22 +52,32 @@ export function normalizeRoute(route) {
   return normalized;
 }
 
-export function routeToFilePath(route, extension = '.astro') {
+export function routeToFilePath(route, options = {}) {
+  const { extension = '.astro', mode = 'flat', indexFile = 'index.astro' } = options;
   const normalized = normalizeRoute(route);
   
   if (normalized === '/') {
-    return 'index' + extension;
+    return indexFile;
   }
   
-  return normalized.slice(1) + extension;
+  const routePath = normalized.slice(1);
+  if (mode === 'nested') {
+    return path.join(routePath, indexFile);
+  }
+  
+  return routePath + extension;
 }
 
 export function featureToDirectoryPath(featurePath) {
   return featurePath.replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
-export function getFeatureFileName(featurePath, extension = '.astro') {
-  return getFeatureComponentName(featurePath) + extension;
+export function getFeatureFileName(featurePath, options = {}) {
+  const { extension = '.astro', strategy = 'index' } = options;
+  if (strategy === 'pascal') {
+    return getFeatureComponentName(featurePath) + extension;
+  }
+  return 'index' + extension;
 }
 
 /**

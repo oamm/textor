@@ -1,5 +1,5 @@
 import path from 'path';
-import { loadConfig, resolvePath } from '../utils/config.js';
+import { loadConfig, resolvePath, getEffectiveOptions } from '../utils/config.js';
 import { 
   normalizeRoute, 
   routeToFilePath, 
@@ -14,7 +14,8 @@ import {
   ensureNotExists, 
   writeFileWithSignature,
   ensureDir,
-  secureJoin 
+  secureJoin,
+  formatFiles
 } from '../utils/filesystem.js';
 import { 
   generateRouteTemplate, 
@@ -23,8 +24,6 @@ import {
   generateHookTemplate,
   generateContextTemplate,
   generateTestTemplate,
-  generateConfigTemplate,
-  generateConstantsTemplate,
   generateIndexTemplate,
   generateTypesTemplate,
   generateApiTemplate,
@@ -34,19 +33,28 @@ import {
   generateReadmeTemplate,
   generateStoriesTemplate
 } from '../utils/templates.js';
-import { addSectionToState } from '../utils/state.js';
+import { addSectionToState, registerFile } from '../utils/state.js';
 
 export async function addSectionCommand(route, featurePath, options) {
   try {
     const config = await loadConfig();
+    const effectiveOptions = getEffectiveOptions(options, config, 'features');
     
     const normalizedRoute = normalizeRoute(route);
     const normalizedFeaturePath = featureToDirectoryPath(featurePath);
     
     const routeExtension = options.endpoint ? '.ts' : config.naming.routeExtension;
-    const routeFileName = routeToFilePath(normalizedRoute, routeExtension);
+    const routeFileName = routeToFilePath(normalizedRoute, {
+      extension: routeExtension,
+      mode: config.routing.mode,
+      indexFile: config.routing.indexFile
+    });
+    
     const featureComponentName = getFeatureComponentName(normalizedFeaturePath);
-    const featureFileName = getFeatureFileName(normalizedFeaturePath, config.naming.featureExtension);
+    const featureFileName = getFeatureFileName(normalizedFeaturePath, {
+      extension: config.naming.featureExtension,
+      strategy: effectiveOptions.entry
+    });
     
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
@@ -65,18 +73,20 @@ export async function addSectionCommand(route, featurePath, options) {
     const servicesDirInside = secureJoin(featureDirPath, 'services');
     const schemasDirInside = secureJoin(featureDirPath, 'schemas');
     
-    const shouldCreateSubComponentsDir = options.subComponentsDir !== undefined ? options.subComponentsDir : config.features.createSubComponentsDir;
-    const shouldCreateScriptsDir = options.scriptsDir !== undefined ? options.scriptsDir : config.features.createScriptsDir;
-    const shouldCreateApi = options.api !== undefined ? options.api : config.features.createApi;
-    const shouldCreateServices = options.services !== undefined ? options.services : config.features.createServices;
-    const shouldCreateSchemas = options.schemas !== undefined ? options.schemas : config.features.createSchemas;
-    const shouldCreateHooks = options.hooks !== undefined ? options.hooks : config.features.createHooks;
-    const shouldCreateContext = options.context !== undefined ? options.context : config.features.createContext;
-    const shouldCreateTests = options.tests !== undefined ? options.tests : config.features.createTests;
-    const shouldCreateTypes = options.types !== undefined ? options.types : config.features.createTypes;
-    const shouldCreateReadme = options.readme !== undefined ? options.readme : config.features.createReadme;
-    const shouldCreateStories = options.stories !== undefined ? options.stories : config.features.createStories;
-    const shouldCreateIndex = options.index !== undefined ? options.index : config.features.createIndex;
+    const {
+      createSubComponentsDir: shouldCreateSubComponentsDir,
+      createScriptsDir: shouldCreateScriptsDir,
+      createApi: shouldCreateApi,
+      createServices: shouldCreateServices,
+      createSchemas: shouldCreateSchemas,
+      createHooks: shouldCreateHooks,
+      createContext: shouldCreateContext,
+      createTests: shouldCreateTests,
+      createTypes: shouldCreateTypes,
+      createReadme: shouldCreateReadme,
+      createStories: shouldCreateStories,
+      createIndex: shouldCreateIndex
+    } = effectiveOptions;
 
     const indexFilePath = path.join(featureDirPath, 'index.ts');
     const contextFilePath = path.join(contextDirInside, `${featureComponentName}Context.tsx`);
@@ -88,8 +98,6 @@ export async function addSectionCommand(route, featurePath, options) {
     const schemasFilePath = path.join(schemasDirInside, 'index.ts');
     const readmeFilePath = path.join(featureDirPath, 'README.md');
     const storiesFilePath = path.join(featureDirPath, `${featureComponentName}.stories.tsx`);
-
-    const createdFiles = [];
 
     if (options.dryRun) {
       console.log('Dry run - would create:');
@@ -127,24 +135,28 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateStories) await ensureNotExists(storiesFilePath, options.force);
     if (shouldCreateScriptsDir) await ensureNotExists(scriptsIndexPath, options.force);
     
-    let layoutImportPath;
-    if (config.importAliases.layouts) {
-      layoutImportPath = `${config.importAliases.layouts}/${options.layout}.astro`;
-    } else {
-      const layoutFilePath = secureJoin(layoutsRoot, `${options.layout}.astro`);
-      layoutImportPath = getRelativeImportPath(routeFilePath, layoutFilePath);
+    let layoutImportPath = null;
+    if (options.layout !== 'none') {
+      if (config.importAliases.layouts) {
+        layoutImportPath = `${config.importAliases.layouts}/${options.layout}.astro`;
+      } else {
+        const layoutFilePath = secureJoin(layoutsRoot, `${options.layout}.astro`);
+        layoutImportPath = getRelativeImportPath(routeFilePath, layoutFilePath);
+      }
     }
 
     let featureImportPath;
     if (config.importAliases.features) {
-      featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}/${featureComponentName}`;
+      const entryPart = effectiveOptions.entry === 'index' ? '' : `/${featureComponentName}`;
+      featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}`;
     } else {
-      const relativeFeatureDir = getRelativeImportPath(routeFilePath, featureDirPath);
-      featureImportPath = `${relativeFeatureDir}/${featureComponentName}`;
+      const relativeFeatureFile = getRelativeImportPath(routeFilePath, featureFilePath);
+      // Remove extension for import
+      featureImportPath = relativeFeatureFile.replace(/\.[^/.]+$/, '');
     }
     
     let scriptImportPath;
-    if (config.features.createScriptsDir) {
+    if (shouldCreateScriptsDir) {
       scriptImportPath = getRelativeImportPath(featureFilePath, scriptsIndexPath);
     }
 
@@ -166,12 +178,15 @@ export async function addSectionCommand(route, featurePath, options) {
     
     const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath);
     
-    await writeFileWithSignature(
+    const routeHash = await writeFileWithSignature(
       routeFilePath,
       routeContent,
       routeSignature
     );
+    await registerFile(routeFilePath, { kind: 'route', template: options.endpoint ? 'endpoint' : 'route', hash: routeHash });
     
+    const writtenFiles = [routeFilePath];
+
     await ensureDir(featureDirPath);
     
     if (shouldCreateSubComponentsDir) await ensureDir(subComponentsDir);
@@ -183,77 +198,106 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateTests) await ensureDir(testsDir);
     if (shouldCreateTypes) await ensureDir(typesDirInside);
 
-    await writeFileWithSignature(
+    const featureHash = await writeFileWithSignature(
       featureFilePath,
       featureContent,
       config.signatures.astro
     );
-    
+    await registerFile(featureFilePath, { kind: 'feature', template: 'feature', hash: featureHash });
+    writtenFiles.push(featureFilePath);
+
     if (shouldCreateScriptsDir) {
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         scriptsIndexPath,
         generateScriptsIndexTemplate(),
         config.signatures.typescript
       );
+      await registerFile(scriptsIndexPath, { kind: 'feature-file', template: 'scripts-index', hash });
+      writtenFiles.push(scriptsIndexPath);
     }
 
     if (shouldCreateIndex) {
       const indexContent = generateIndexTemplate(featureComponentName, config.naming.featureExtension);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         indexFilePath,
         indexContent,
         config.signatures.typescript
       );
+      await registerFile(indexFilePath, { kind: 'feature-file', template: 'index', hash });
+      writtenFiles.push(indexFilePath);
     }
 
     if (shouldCreateApi) {
       const apiContent = generateApiTemplate(featureComponentName);
-      await writeFileWithSignature(apiFilePath, apiContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(apiFilePath, apiContent, config.signatures.typescript);
+      await registerFile(apiFilePath, { kind: 'feature-file', template: 'api', hash });
+      writtenFiles.push(apiFilePath);
     }
 
     if (shouldCreateServices) {
       const servicesContent = generateServiceTemplate(featureComponentName);
-      await writeFileWithSignature(servicesFilePath, servicesContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(servicesFilePath, servicesContent, config.signatures.typescript);
+      await registerFile(servicesFilePath, { kind: 'feature-file', template: 'service', hash });
+      writtenFiles.push(servicesFilePath);
     }
 
     if (shouldCreateSchemas) {
       const schemasContent = generateSchemaTemplate(featureComponentName);
-      await writeFileWithSignature(schemasFilePath, schemasContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(schemasFilePath, schemasContent, config.signatures.typescript);
+      await registerFile(schemasFilePath, { kind: 'feature-file', template: 'schema', hash });
+      writtenFiles.push(schemasFilePath);
     }
 
     if (shouldCreateHooks) {
       const hookName = getHookFunctionName(featureComponentName);
       const hookContent = generateHookTemplate(featureComponentName, hookName);
-      await writeFileWithSignature(hookFilePath, hookContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(hookFilePath, hookContent, config.signatures.typescript);
+      await registerFile(hookFilePath, { kind: 'feature-file', template: 'hook', hash });
+      writtenFiles.push(hookFilePath);
     }
 
     if (shouldCreateContext) {
       const contextContent = generateContextTemplate(featureComponentName);
-      await writeFileWithSignature(contextFilePath, contextContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(contextFilePath, contextContent, config.signatures.typescript);
+      await registerFile(contextFilePath, { kind: 'feature-file', template: 'context', hash });
+      writtenFiles.push(contextFilePath);
     }
 
     if (shouldCreateTests) {
-      const relativeFeaturePath = `./${featureComponentName}${config.naming.featureExtension}`;
+      const relativeFeaturePath = `./${path.basename(featureFilePath)}`;
       const testContent = generateTestTemplate(featureComponentName, relativeFeaturePath);
-      await writeFileWithSignature(testFilePath, testContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(testFilePath, testContent, config.signatures.typescript);
+      await registerFile(testFilePath, { kind: 'feature-file', template: 'test', hash });
+      writtenFiles.push(testFilePath);
     }
 
     if (shouldCreateTypes) {
       const typesContent = generateTypesTemplate(featureComponentName);
-      await writeFileWithSignature(typesFilePath, typesContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(typesFilePath, typesContent, config.signatures.typescript);
+      await registerFile(typesFilePath, { kind: 'feature-file', template: 'types', hash });
+      writtenFiles.push(typesFilePath);
     }
 
     if (shouldCreateReadme) {
       const readmeContent = generateReadmeTemplate(featureComponentName);
-      await writeFileWithSignature(readmeFilePath, readmeContent, config.signatures.astro);
+      const hash = await writeFileWithSignature(readmeFilePath, readmeContent, config.signatures.astro);
+      await registerFile(readmeFilePath, { kind: 'feature-file', template: 'readme', hash });
+      writtenFiles.push(readmeFilePath);
     }
 
     if (shouldCreateStories) {
-      const relativePath = `./${featureComponentName}${config.naming.featureExtension}`;
+      const relativePath = `./${path.basename(featureFilePath)}`;
       const storiesContent = generateStoriesTemplate(featureComponentName, relativePath);
-      await writeFileWithSignature(storiesFilePath, storiesContent, config.signatures.typescript);
+      const hash = await writeFileWithSignature(storiesFilePath, storiesContent, config.signatures.typescript);
+      await registerFile(storiesFilePath, { kind: 'feature-file', template: 'stories', hash });
+      writtenFiles.push(storiesFilePath);
     }
     
+    // Formatting
+    if (config.formatting.tool !== 'none') {
+        await formatFiles(writtenFiles, config.formatting.tool);
+    }
+
     console.log('✓ Section created successfully:');
     console.log(`  Route: ${routeFilePath}`);
     console.log(`  Feature: ${featureFilePath}`);

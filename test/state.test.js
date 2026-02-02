@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { writeFile, mkdir, rm, readFile } from 'fs/promises';
+import { mkdir, rm, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { initCommand } from '../src/commands/init.js';
@@ -40,12 +40,16 @@ describe('State Management', () => {
     expect(state.sections).toHaveLength(1);
     expect(state.sections[0].route).toBe('/users');
     expect(state.sections[0].featurePath).toBe('users/catalog');
+    expect(state.files).toBeDefined();
+    // Should have at least route and feature file
+    expect(Object.keys(state.files).length).toBeGreaterThanOrEqual(2);
 
     // Remove by route only
     await removeSectionCommand('/users', null, {});
     
     const updatedState = JSON.parse(await readFile(statePath, 'utf-8'));
     expect(updatedState.sections).toHaveLength(0);
+    expect(Object.keys(updatedState.files)).toHaveLength(0);
     expect(existsSync(path.join(TEST_DIR, 'src/pages/users.astro'))).toBe(false);
   });
 
@@ -56,11 +60,14 @@ describe('State Management', () => {
     const state = JSON.parse(await readFile(statePath, 'utf-8'));
     expect(state.components).toHaveLength(1);
     expect(state.components[0].name).toBe('Button');
+    expect(state.files).toBeDefined();
+    expect(Object.keys(state.files).length).toBeGreaterThan(0);
 
     await removeComponentCommand('Button', {});
     
     const updatedState = JSON.parse(await readFile(statePath, 'utf-8'));
     expect(updatedState.components).toHaveLength(0);
+    expect(Object.keys(updatedState.files)).toHaveLength(0);
     expect(existsSync(path.join(TEST_DIR, 'src/components/Button'))).toBe(false);
   });
 

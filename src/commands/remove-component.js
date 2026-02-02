@@ -4,7 +4,7 @@ import {
   cleanupEmptyDirs,
   secureJoin 
 } from '../utils/filesystem.js';
-import { loadState, findComponent, removeComponentFromState } from '../utils/state.js';
+import { loadState, findComponent, saveState } from '../utils/state.js';
 import path from 'path';
 
 export async function removeComponentCommand(identifier, options) {
@@ -29,12 +29,25 @@ export async function removeComponentCommand(identifier, options) {
       return;
     }
     
-    const result = await safeDeleteDir(componentDir, options.force);
+    const result = await safeDeleteDir(componentDir, {
+      force: options.force,
+      stateFiles: state.files,
+      acceptChanges: options.acceptChanges
+    });
     
     if (result.deleted) {
       console.log(`✓ Deleted component: ${componentDir}/`);
       await cleanupEmptyDirs(path.dirname(componentDir), path.join(process.cwd(), config.paths.components));
-      await removeComponentFromState(identifier);
+      
+      // Unregister files
+      const dirPrefix = path.relative(process.cwd(), componentDir).replace(/\\/g, '/') + '/';
+      for (const f in state.files) {
+        if (f.startsWith(dirPrefix)) {
+          delete state.files[f];
+        }
+      }
+      state.components = state.components.filter(c => c.name !== identifier && c.path !== componentDir);
+      await saveState(state);
     } else if (result.message) {
       console.log(`⚠ Skipped: ${componentDir}`);
       console.log(`    Reason: ${result.message}`);

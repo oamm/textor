@@ -6,7 +6,6 @@ import {
   normalizeRoute, 
   routeToFilePath, 
   featureToDirectoryPath,
-  getFeatureFileName,
   getFeatureComponentName,
   getRelativeImportPath 
 } from '../utils/naming.js';
@@ -17,7 +16,7 @@ import {
   cleanupEmptyDirs,
   secureJoin
 } from '../utils/filesystem.js';
-import { loadState, findSection, updateSectionInState } from '../utils/state.js';
+import { loadState, findSection, saveState } from '../utils/state.js';
 
 export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeature, options) {
   try {
@@ -46,9 +45,13 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
                 const oldFeatureParts = actualFromFeature.split('/').filter(Boolean);
                 
                 // If the feature path starts with the old route parts, replace them
+                // We compare case-insensitively or via PascalCase to be more helpful
                 let match = true;
                 for (let i = 0; i < oldRouteParts.length; i++) {
-                    if (oldFeatureParts[i] !== oldRouteParts[i]) {
+                    const routePart = oldRouteParts[i].toLowerCase();
+                    const featurePart = oldFeatureParts[i] ? oldFeatureParts[i].toLowerCase() : null;
+                    
+                    if (featurePart !== routePart) {
                         match = false;
                         break;
                     }
@@ -62,8 +65,6 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
                 }
             }
         }
-    } else if (!fromFeature && fromRoute) {
-        // Might be just name? but move needs destination.
     }
 
     const isRouteOnly = options.keepFeature || (!actualToFeature && actualToRoute && !actualFromFeature);
@@ -83,8 +84,16 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     const fromSection = findSection(state, actualFromRoute);
     const routeExtension = (fromSection && fromSection.extension) || config.naming.routeExtension;
     
-    const fromRouteFile = routeToFilePath(normalizedFromRoute, routeExtension);
-    const toRouteFile = routeToFilePath(normalizedToRoute, routeExtension);
+    const fromRouteFile = routeToFilePath(normalizedFromRoute, {
+      extension: routeExtension,
+      mode: config.routing.mode,
+      indexFile: config.routing.indexFile
+    });
+    const toRouteFile = routeToFilePath(normalizedToRoute, {
+      extension: routeExtension,
+      mode: config.routing.mode,
+      indexFile: config.routing.indexFile
+    });
     
     const fromRoutePath = secureJoin(pagesRoot, fromRouteFile);
     const toRoutePath = secureJoin(pagesRoot, toRouteFile);
@@ -104,8 +113,22 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       return;
     }
     
-    await safeMove(fromRoutePath, toRoutePath, options.force);
+    const normalizedFromRouteRelative = path.relative(process.cwd(), fromRoutePath).replace(/\\/g, '/');
+    const routeFileState = state.files[normalizedFromRouteRelative];
+
+    const newRouteHash = await safeMove(fromRoutePath, toRoutePath, {
+      force: options.force,
+      expectedHash: routeFileState?.hash,
+      acceptChanges: options.acceptChanges
+    });
     movedFiles.push({ from: fromRoutePath, to: toRoutePath });
+    
+    // Update state for moved route file
+    const normalizedToRouteRelative = path.relative(process.cwd(), toRoutePath).replace(/\\/g, '/');
+    if (routeFileState) {
+      state.files[normalizedToRouteRelative] = { ...routeFileState, hash: newRouteHash };
+      delete state.files[normalizedFromRouteRelative];
+    }
     
     // Update imports in the moved route file
     const targetFeature = normalizedToFeature || normalizedFromFeature;
@@ -167,8 +190,15 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       const fromFeaturePath = secureJoin(featuresRoot, normalizedFromFeature);
       const toFeaturePath = secureJoin(featuresRoot, normalizedToFeature);
       
+      const fromFeatureComponentName = getFeatureComponentName(normalizedFromFeature);
+      const toFeatureComponentName = getFeatureComponentName(normalizedToFeature);
+      
       if (existsSync(fromFeaturePath)) {
-        await moveDirectory(fromFeaturePath, toFeaturePath, options.force);
+        await moveDirectory(fromFeaturePath, toFeaturePath, state, {
+          ...options,
+          fromName: fromFeatureComponentName,
+          toName: toFeatureComponentName
+        });
         movedFiles.push({ from: fromFeaturePath, to: toFeaturePath });
         
         await cleanupEmptyDirs(path.dirname(fromFeaturePath), featuresRoot);
@@ -184,14 +214,19 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     });
 
     if (movedFiles.length > 0) {
-      const existingSection = findSection(state, normalizedFromRoute);
-      await updateSectionInState(normalizedFromRoute, {
+      const existingSection = fromSection;
+      
+      // Update section data in state
+      state.sections = state.sections.filter(s => s.route !== normalizedFromRoute);
+      state.sections.push({
         name: existingSection ? existingSection.name : getFeatureComponentName(normalizedToFeature || normalizedFromFeature),
         route: normalizedToRoute,
         featurePath: normalizedToFeature || normalizedFromFeature,
         layout: existingSection ? existingSection.layout : 'Main',
         extension: routeExtension
       });
+      
+      await saveState(state);
     }
     
   } catch (error) {
@@ -200,12 +235,14 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
   }
 }
 
-async function moveDirectory(fromPath, toPath, force = false) {
+async function moveDirectory(fromPath, toPath, state, options = {}) {
+  const { fromName, toName } = options;
+  
   if (!existsSync(fromPath)) {
     throw new Error(`Source directory not found: ${fromPath}`);
   }
   
-  if (existsSync(toPath) && !force) {
+  if (existsSync(toPath) && !options.force) {
     throw new Error(
       `Destination already exists: ${toPath}\n` +
       `Use --force to overwrite.`
@@ -217,15 +254,78 @@ async function moveDirectory(fromPath, toPath, force = false) {
   const entries = await readdir(fromPath);
   
   for (const entry of entries) {
+    let targetEntry = entry;
+    
+    // Rename files if they match the component name
+    if (fromName && toName && fromName !== toName) {
+      if (entry.includes(fromName)) {
+        targetEntry = entry.replace(fromName, toName);
+      }
+    }
+    
     const fromEntryPath = path.join(fromPath, entry);
-    const toEntryPath = path.join(toPath, entry);
+    const toEntryPath = path.join(toPath, targetEntry);
     
     const stats = await stat(fromEntryPath);
     
     if (stats.isDirectory()) {
-      await moveDirectory(fromEntryPath, toEntryPath, force);
+      await moveDirectory(fromEntryPath, toEntryPath, state, options);
     } else {
-      await safeMove(fromEntryPath, toEntryPath, force);
+      const normalizedFromRelative = path.relative(process.cwd(), fromEntryPath).replace(/\\/g, '/');
+      const fileState = state.files[normalizedFromRelative];
+      
+      const newHash = await safeMove(fromEntryPath, toEntryPath, {
+        force: options.force,
+        expectedHash: fileState?.hash,
+        acceptChanges: options.acceptChanges
+      });
+      
+      // Update internal content (signatures, component names) if renaming
+      if (fromName && toName && fromName !== toName) {
+        let content = await readFile(toEntryPath, 'utf-8');
+        let hasChanged = false;
+        
+        // Simple replacement of component names
+        if (content.includes(fromName)) {
+           content = content.replace(new RegExp(fromName, 'g'), toName);
+           hasChanged = true;
+        }
+        
+        // Also handle lowercase class names if any
+        const fromLower = fromName.toLowerCase();
+        const toLower = toName.toLowerCase();
+        if (content.includes(fromLower)) {
+           content = content.replace(new RegExp(fromLower, 'g'), toLower);
+           hasChanged = true;
+        }
+
+        if (hasChanged) {
+           await writeFile(toEntryPath, content, 'utf-8');
+           // Re-calculate hash after content update
+           const { calculateHash } = await import('../utils/filesystem.js');
+           const updatedHash = calculateHash(content);
+           
+           const normalizedToRelative = path.relative(process.cwd(), toEntryPath).replace(/\\/g, '/');
+           if (fileState) {
+              state.files[normalizedToRelative] = { ...fileState, hash: updatedHash };
+              delete state.files[normalizedFromRelative];
+           }
+        } else {
+           // Update state for each file moved normally
+           const normalizedToRelative = path.relative(process.cwd(), toEntryPath).replace(/\\/g, '/');
+           if (fileState) {
+              state.files[normalizedToRelative] = { ...fileState, hash: newHash };
+              delete state.files[normalizedFromRelative];
+           }
+        }
+      } else {
+        // Update state for each file moved normally
+        const normalizedToRelative = path.relative(process.cwd(), toEntryPath).replace(/\\/g, '/');
+        if (fileState) {
+          state.files[normalizedToRelative] = { ...fileState, hash: newHash };
+          delete state.files[normalizedFromRelative];
+        }
+      }
     }
   }
   

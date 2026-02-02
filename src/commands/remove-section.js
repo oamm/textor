@@ -3,8 +3,7 @@ import { loadConfig, resolvePath } from '../utils/config.js';
 import { 
   normalizeRoute, 
   routeToFilePath, 
-  featureToDirectoryPath,
-  getFeatureFileName 
+  featureToDirectoryPath
 } from '../utils/naming.js';
 import { 
   safeDelete, 
@@ -12,7 +11,7 @@ import {
   cleanupEmptyDirs,
   secureJoin 
 } from '../utils/filesystem.js';
-import { loadState, findSection, removeSectionFromState } from '../utils/state.js';
+import { loadState, findSection, saveState } from '../utils/state.js';
 
 export async function removeSectionCommand(route, featurePath, options) {
   try {
@@ -36,15 +35,17 @@ export async function removeSectionCommand(route, featurePath, options) {
     const normalizedFeaturePath = featureToDirectoryPath(targetFeaturePath);
     
     const routeExtension = (section && section.extension) || config.naming.routeExtension;
-    const routeFileName = routeToFilePath(normalizedRoute, routeExtension);
-    const featureFileName = getFeatureFileName(normalizedFeaturePath, config.naming.featureExtension);
+    const routeFileName = routeToFilePath(normalizedRoute, {
+      extension: routeExtension,
+      mode: config.routing.mode,
+      indexFile: config.routing.indexFile
+    });
     
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
     
     const routeFilePath = secureJoin(pagesRoot, routeFileName);
     const featureDirPath = secureJoin(featuresRoot, normalizedFeaturePath);
-    const featureFilePath = path.join(featureDirPath, featureFileName);
     
     const deletedFiles = [];
     const skippedFiles = [];
@@ -65,20 +66,38 @@ export async function removeSectionCommand(route, featurePath, options) {
     }
     
     if (!options.keepRoute) {
-      const result = await safeDelete(routeFilePath, options.force);
+      const normalizedPath = path.relative(process.cwd(), routeFilePath).replace(/\\/g, '/');
+      const fileState = state.files[normalizedPath];
+      const result = await safeDelete(routeFilePath, {
+        force: options.force,
+        expectedHash: fileState?.hash,
+        acceptChanges: options.acceptChanges
+      });
       
       if (result.deleted) {
         deletedFiles.push(routeFilePath);
+        delete state.files[normalizedPath];
       } else if (result.message) {
         skippedFiles.push({ path: routeFilePath, reason: result.message });
       }
     }
     
     if (!options.keepFeature) {
-      const result = await safeDeleteDir(featureDirPath, options.force);
+      const result = await safeDeleteDir(featureDirPath, {
+        force: options.force,
+        stateFiles: state.files,
+        acceptChanges: options.acceptChanges
+      });
       
       if (result.deleted) {
         deletedDirs.push(featureDirPath);
+        // Unregister all files that were in this directory
+        const dirPrefix = path.relative(process.cwd(), featureDirPath).replace(/\\/g, '/') + '/';
+        for (const f in state.files) {
+          if (f.startsWith(dirPrefix)) {
+            delete state.files[f];
+          }
+        }
       } else if (result.message) {
         skippedFiles.push({ path: featureDirPath, reason: result.message });
       }
@@ -109,7 +128,8 @@ export async function removeSectionCommand(route, featurePath, options) {
     if (deletedFiles.length === 0 && deletedDirs.length === 0 && skippedFiles.length === 0) {
       console.log('No files to delete.');
     } else {
-      await removeSectionFromState(normalizedRoute);
+      state.sections = state.sections.filter(s => s.route !== normalizedRoute);
+      await saveState(state);
     }
     
   } catch (error) {

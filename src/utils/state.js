@@ -12,14 +12,16 @@ export function getStatePath() {
 export async function loadState() {
   const statePath = getStatePath();
   if (!existsSync(statePath)) {
-    return { sections: [], components: [] };
+    return { sections: [], components: [], files: {} };
   }
 
   try {
     const content = await readFile(statePath, 'utf-8');
-    return JSON.parse(content);
+    const state = JSON.parse(content);
+    if (!state.files) state.files = {};
+    return state;
   } catch (error) {
-    return { sections: [], components: [] };
+    return { sections: [], components: [], files: {} };
   }
 }
 
@@ -30,6 +32,33 @@ export async function saveState(state) {
     await mkdir(dir, { recursive: true });
   }
   await writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
+}
+
+export async function registerFile(filePath, { kind, template, hash }) {
+  const state = await loadState();
+  const normalizedPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+  
+  state.files[normalizedPath] = {
+    kind,
+    template,
+    hash,
+    timestamp: new Date().toISOString()
+  };
+  
+  await saveState(state);
+}
+
+export async function unregisterFile(filePath) {
+  const state = await loadState();
+  const normalizedPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+  delete state.files[normalizedPath];
+  await saveState(state);
+}
+
+export async function getFileData(filePath) {
+  const state = await loadState();
+  const normalizedPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+  return state.files[normalizedPath];
 }
 
 export async function addSectionToState(section) {

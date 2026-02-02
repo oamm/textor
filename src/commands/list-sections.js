@@ -35,6 +35,35 @@ export async function listSectionsCommand() {
           if (stateSection) {
               console.log(`    Feature: ${stateSection.featurePath}`);
               console.log(`    Layout: ${stateSection.layout}`);
+              
+              // Check for senior architecture folders/files
+              const featuresRoot = resolvePath(config, 'features');
+              const featureDir = path.join(featuresRoot, stateSection.featurePath);
+              const capabilities = [];
+              
+              const checkDir = (subDir, label) => {
+                  if (existsSync(path.join(featureDir, subDir))) capabilities.push(label);
+              };
+              
+              checkDir('api', 'API');
+              checkDir('services', 'Services');
+              checkDir('schemas', 'Schemas');
+              checkDir('hooks', 'Hooks');
+              checkDir('context', 'Context');
+              checkDir('types', 'Types');
+              checkDir('scripts', 'Scripts');
+              checkDir('sub-components', 'Sub-components');
+              checkDir('__tests__', 'Tests');
+              
+              if (existsSync(path.join(featureDir, 'README.md'))) capabilities.push('Docs');
+              
+              const storiesFile = (await readdir(featureDir).catch(() => []))
+                  .find(f => f.endsWith('.stories.tsx') || f.endsWith('.stories.jsx'));
+              if (storiesFile) capabilities.push('Stories');
+
+              if (capabilities.length > 0) {
+                  console.log(`    Architecture: ${capabilities.join(', ')}`);
+              }
           } else {
             // Try to extract feature path from the file content
             const content = await readFile(section, 'utf-8');
@@ -56,6 +85,34 @@ export async function listSectionsCommand() {
       console.log('\nManaged Components:');
       for (const component of state.components) {
         console.log(`  - ${component.name} (${path.relative(process.cwd(), component.path)})`);
+        
+        const componentDir = component.path;
+        const capabilities = [];
+        
+        const checkDir = (subDir, label) => {
+            if (existsSync(path.join(componentDir, subDir))) capabilities.push(label);
+        };
+        
+        checkDir('api', 'API');
+        checkDir('services', 'Services');
+        checkDir('schemas', 'Schemas');
+        checkDir('hooks', 'Hooks');
+        checkDir('context', 'Context');
+        checkDir('types', 'Types');
+        checkDir('sub-components', 'Sub-components');
+        checkDir('__tests__', 'Tests');
+        checkDir('config', 'Config');
+        checkDir('constants', 'Constants');
+        
+        if (existsSync(path.join(componentDir, 'README.md'))) capabilities.push('Docs');
+        
+        const storiesFile = (await readdir(componentDir).catch(() => []))
+            .find(f => f.endsWith('.stories.tsx') || f.endsWith('.stories.jsx'));
+        if (storiesFile) capabilities.push('Stories');
+
+        if (capabilities.length > 0) {
+            console.log(`    Architecture: ${capabilities.join(', ')}`);
+        }
       }
     }
   } catch (error) {

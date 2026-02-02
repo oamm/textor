@@ -1,26 +1,42 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
-function getTemplateOverride(templateName, data = {}) {
-  const overridePath = path.join(process.cwd(), '.textor', 'templates', `${templateName}.astro`);
+function getTemplateOverride(templateName, extension, data = {}) {
+  const overridePath = path.join(process.cwd(), '.textor', 'templates', `${templateName}${extension}`);
   if (existsSync(overridePath)) {
     let content = readFileSync(overridePath, 'utf-8');
     for (const [key, value] of Object.entries(data)) {
-      content = content.replace(new RegExp(`{{${key}}}`, 'g'), () => value);
+      content = content.replace(new RegExp(`{{${key}}}`, 'g'), () => value || '');
     }
     return content;
   }
   return null;
 }
 
+/**
+ * Route Template Variables:
+ * - layoutName: The name of the layout component
+ * - layoutImportPath: Path to import the layout
+ * - featureImportPath: Path to import the feature component
+ * - featureComponentName: Name of the feature component
+ */
 export function generateRouteTemplate(layoutName, layoutImportPath, featureImportPath, featureComponentName) {
-  const override = getTemplateOverride('route', {
+  const override = getTemplateOverride('route', '.astro', {
     layoutName,
     layoutImportPath,
     featureImportPath,
     featureComponentName
   });
   if (override) return override;
+
+  if (layoutName === 'none') {
+    return `---
+import ${featureComponentName} from '${featureImportPath}';
+---
+
+<${featureComponentName} />
+`;
+  }
 
   return `---
 import ${layoutName} from '${layoutImportPath}';
@@ -33,8 +49,13 @@ import ${featureComponentName} from '${featureImportPath}';
 `;
 }
 
+/**
+ * Feature Template Variables:
+ * - componentName: Name of the feature component
+ * - scriptImportPath: Path to the feature's client-side script
+ */
 export function generateFeatureTemplate(componentName, scriptImportPath) {
-  const override = getTemplateOverride('feature', { componentName, scriptImportPath });
+  const override = getTemplateOverride('feature', '.astro', { componentName, scriptImportPath });
   if (override) return override;
 
   const scriptTag = scriptImportPath ? `\n<script src="${scriptImportPath}"></script>` : '';
@@ -49,16 +70,23 @@ export function generateFeatureTemplate(componentName, scriptImportPath) {
 `;
 }
 
+/**
+ * Scripts Index Template (no variables)
+ */
 export function generateScriptsIndexTemplate() {
-  const override = getTemplateOverride('scripts-index');
+  const override = getTemplateOverride('scripts-index', '.ts');
   if (override) return override;
 
   return `export {};
 `;
 }
 
+/**
+ * Component Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateComponentTemplate(componentName) {
-  const override = getTemplateOverride('component', { componentName });
+  const override = getTemplateOverride('component', '.astro', { componentName });
   if (override) return override;
 
   return `---
@@ -75,8 +103,13 @@ const props = Astro.props;
 `;
 }
 
+/**
+ * Hook Template Variables:
+ * - componentName: Name of the component
+ * - hookName: Name of the hook function (e.g., useButton)
+ */
 export function generateHookTemplate(componentName, hookName) {
-  const override = getTemplateOverride('hook', { componentName, hookName });
+  const override = getTemplateOverride('hook', '.ts', { componentName, hookName });
   if (override) return override;
 
   return `import { useState } from 'react';
@@ -91,8 +124,12 @@ export function ${hookName}() {
 `;
 }
 
+/**
+ * Context Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateContextTemplate(componentName) {
-  const override = getTemplateOverride('context', { componentName });
+  const override = getTemplateOverride('context', '.tsx', { componentName });
   if (override) return override;
 
   return `import { createContext, useContext } from 'react';
@@ -126,8 +163,13 @@ export function use${componentName}Context() {
 `;
 }
 
+/**
+ * Test Template Variables:
+ * - componentName: Name of the component
+ * - componentPath: Relative path to the component file
+ */
 export function generateTestTemplate(componentName, componentPath) {
-  const override = getTemplateOverride('test', { componentName, componentPath });
+  const override = getTemplateOverride('test', '.tsx', { componentName, componentPath });
   if (override) return override;
 
   return `import { describe, it, expect } from 'vitest';
@@ -143,8 +185,12 @@ describe('${componentName}', () => {
 `;
 }
 
+/**
+ * Config Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateConfigTemplate(componentName) {
-  const override = getTemplateOverride('config', { componentName });
+  const override = getTemplateOverride('config', '.ts', { componentName });
   if (override) return override;
 
   return `export const ${componentName}Config = {
@@ -153,8 +199,12 @@ export function generateConfigTemplate(componentName) {
 `;
 }
 
+/**
+ * Constants Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateConstantsTemplate(componentName) {
-  const override = getTemplateOverride('constants', { componentName });
+  const override = getTemplateOverride('constants', '.ts', { componentName });
   if (override) return override;
 
   return `export const ${componentName.toUpperCase()}_CONSTANTS = {
@@ -163,8 +213,13 @@ export function generateConstantsTemplate(componentName) {
 `;
 }
 
+/**
+ * Index Template Variables:
+ * - componentName: Name of the component
+ * - componentExtension: File extension of the component
+ */
 export function generateIndexTemplate(componentName, componentExtension) {
-  const override = getTemplateOverride('index', { componentName, componentExtension });
+  const override = getTemplateOverride('index', '.ts', { componentName, componentExtension });
   if (override) return override;
 
   return `export { default as ${componentName} } from './${componentName}${componentExtension}';
@@ -172,8 +227,12 @@ export * from './types';
 `;
 }
 
+/**
+ * Types Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateTypesTemplate(componentName) {
-  const override = getTemplateOverride('types', { componentName });
+  const override = getTemplateOverride('types', '.ts', { componentName });
   if (override) return override;
 
   return `export type ${componentName}Props = {
@@ -182,8 +241,12 @@ export function generateTypesTemplate(componentName) {
 `;
 }
 
+/**
+ * API Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateApiTemplate(componentName) {
-  const override = getTemplateOverride('api', { componentName });
+  const override = getTemplateOverride('api', '.ts', { componentName });
   if (override) return override;
 
   return `export function GET({ params, request }) {
@@ -197,8 +260,12 @@ export function generateApiTemplate(componentName) {
 `;
 }
 
+/**
+ * Endpoint Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateEndpointTemplate(componentName) {
-  const override = getTemplateOverride('endpoint', { componentName });
+  const override = getTemplateOverride('endpoint', '.ts', { componentName });
   if (override) return override;
 
   return `export function GET({ params, request }) {
@@ -212,32 +279,53 @@ export function generateEndpointTemplate(componentName) {
 `;
 }
 
+/**
+ * Service Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateServiceTemplate(componentName) {
-  const override = getTemplateOverride('service', { componentName });
+  const override = getTemplateOverride('service', '.ts', { componentName });
   if (override) return override;
 
   return `// ${componentName} business logic and transformers
-export function format${componentName}Data(data: any) {
+export async function get${componentName}Data() {
+  // Encapsulated logic for data processing
+  return [];
+}
+
+export function transform${componentName}Data(data: any) {
+  // Domain-specific data transformations
   return data;
 }
 `;
 }
 
+/**
+ * Schema Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateSchemaTemplate(componentName) {
-  const override = getTemplateOverride('schema', { componentName });
+  const override = getTemplateOverride('schema', '.ts', { componentName });
   if (override) return override;
 
-  return `// ${componentName} validation schemas
-// import { z } from 'zod';
+  return `import { z } from 'zod';
 
-// export const ${componentName}Schema = z.object({
-//   id: z.string(),
-// });
+export const ${componentName}Schema = z.object({
+  id: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
+});
+
+export type ${componentName} = z.infer<typeof ${componentName}Schema>;
 `;
 }
 
+/**
+ * Readme Template Variables:
+ * - componentName: Name of the component
+ */
 export function generateReadmeTemplate(componentName) {
-  const override = getTemplateOverride('readme', { componentName });
+  const override = getTemplateOverride('readme', '.md', { componentName });
   if (override) return override;
 
   return `# ${componentName}
@@ -250,8 +338,13 @@ How to use this and what are its requirements.
 `;
 }
 
+/**
+ * Stories Template Variables:
+ * - componentName: Name of the component
+ * - componentPath: Relative path to the component file
+ */
 export function generateStoriesTemplate(componentName, componentPath) {
-  const override = getTemplateOverride('stories', { componentName, componentPath });
+  const override = getTemplateOverride('stories', '.tsx', { componentName, componentPath });
   if (override) return override;
 
   return `import type { Meta, StoryObj } from '@storybook/react';

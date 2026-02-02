@@ -1,5 +1,5 @@
 import path from 'path';
-import { loadConfig, resolvePath } from '../utils/config.js';
+import { loadConfig, resolvePath, getEffectiveOptions } from '../utils/config.js';
 import { 
   normalizeComponentName,
   getHookFileName,
@@ -9,7 +9,8 @@ import {
   ensureNotExists, 
   writeFileWithSignature,
   ensureDir,
-  secureJoin 
+  secureJoin,
+  formatFiles 
 } from '../utils/filesystem.js';
 import {
   generateComponentTemplate,
@@ -26,11 +27,12 @@ import {
   generateReadmeTemplate,
   generateStoriesTemplate
 } from '../utils/templates.js';
-import { addComponentToState } from '../utils/state.js';
+import { addComponentToState, registerFile } from '../utils/state.js';
 
 export async function createComponentCommand(componentName, options) {
   try {
     const config = await loadConfig();
+    const effectiveOptions = getEffectiveOptions(options, config, 'components');
     
     const normalizedName = normalizeComponentName(componentName);
     
@@ -48,20 +50,20 @@ export async function createComponentCommand(componentName, options) {
     const servicesDirInside = secureJoin(componentDir, 'services');
     const schemasDirInside = secureJoin(componentDir, 'schemas');
     
-    const createdFiles = [];
-    
-    const shouldCreateContext = options.context !== undefined ? options.context : config.components.createContext;
-    const shouldCreateHook = options.hook !== undefined ? options.hook : config.components.createHook;
-    const shouldCreateTests = options.tests !== undefined ? options.tests : config.components.createTests;
-    const shouldCreateConfig = options.config !== undefined ? options.config : config.components.createConfig;
-    const shouldCreateConstants = options.constants !== undefined ? options.constants : config.components.createConstants;
-    const shouldCreateTypes = options.types !== undefined ? options.types : config.components.createTypes;
-    const shouldCreateSubComponentsDir = options.subComponentsDir !== undefined ? options.subComponentsDir : config.components.createSubComponentsDir;
-    const shouldCreateApi = options.api !== undefined ? options.api : config.components.createApi;
-    const shouldCreateServices = options.services !== undefined ? options.services : config.components.createServices;
-    const shouldCreateSchemas = options.schemas !== undefined ? options.schemas : config.components.createSchemas;
-    const shouldCreateReadme = options.readme !== undefined ? options.readme : config.components.createReadme;
-    const shouldCreateStories = options.stories !== undefined ? options.stories : config.components.createStories;
+    const {
+      createContext: shouldCreateContext,
+      createHook: shouldCreateHook,
+      createTests: shouldCreateTests,
+      createConfig: shouldCreateConfig,
+      createConstants: shouldCreateConstants,
+      createTypes: shouldCreateTypes,
+      createSubComponentsDir: shouldCreateSubComponentsDir,
+      createApi: shouldCreateApi,
+      createServices: shouldCreateServices,
+      createSchemas: shouldCreateSchemas,
+      createReadme: shouldCreateReadme,
+      createStories: shouldCreateStories
+    } = effectiveOptions;
     
     const componentFilePath = path.join(componentDir, `${normalizedName}${config.naming.componentExtension}`);
     const indexFilePath = path.join(componentDir, 'index.ts');
@@ -127,140 +129,169 @@ export async function createComponentCommand(componentName, options) {
     if (shouldCreateSchemas) await ensureDir(schemasDirInside);
     
     const componentContent = generateComponentTemplate(normalizedName);
-    await writeFileWithSignature(
+    const componentHash = await writeFileWithSignature(
       componentFilePath,
       componentContent,
       config.signatures.astro
     );
-    createdFiles.push(componentFilePath);
+    await registerFile(componentFilePath, { kind: 'component', template: 'component', hash: componentHash });
+    
+    const writtenFiles = [componentFilePath];
 
     const indexContent = generateIndexTemplate(normalizedName, config.naming.componentExtension);
-    await writeFileWithSignature(
+    const indexHash = await writeFileWithSignature(
       indexFilePath,
       indexContent,
       config.signatures.typescript
     );
-    createdFiles.push(indexFilePath);
+    await registerFile(indexFilePath, { kind: 'component-file', template: 'index', hash: indexHash });
+    writtenFiles.push(indexFilePath);
     
     if (shouldCreateTypes) {
       const typesContent = generateTypesTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         typesFilePath,
         typesContent,
         config.signatures.typescript
       );
-      createdFiles.push(typesFilePath);
+      await registerFile(typesFilePath, { kind: 'component-file', template: 'types', hash });
+      writtenFiles.push(typesFilePath);
     }
     
     if (shouldCreateContext) {
       const contextContent = generateContextTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         contextFilePath,
         contextContent,
         config.signatures.typescript
       );
-      createdFiles.push(contextFilePath);
+      await registerFile(contextFilePath, { kind: 'component-file', template: 'context', hash });
+      writtenFiles.push(contextFilePath);
     }
     
     if (shouldCreateHook) {
       const hookName = getHookFunctionName(normalizedName);
       const hookContent = generateHookTemplate(normalizedName, hookName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         hookFilePath,
         hookContent,
         config.signatures.typescript
       );
-      createdFiles.push(hookFilePath);
+      await registerFile(hookFilePath, { kind: 'component-file', template: 'hook', hash });
+      writtenFiles.push(hookFilePath);
     }
     
     if (shouldCreateTests) {
       const relativeComponentPath = `../${normalizedName}${config.naming.componentExtension}`;
       const testContent = generateTestTemplate(normalizedName, relativeComponentPath);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         testFilePath,
         testContent,
         config.signatures.typescript
       );
-      createdFiles.push(testFilePath);
+      await registerFile(testFilePath, { kind: 'component-file', template: 'test', hash });
+      writtenFiles.push(testFilePath);
     }
     
     if (shouldCreateConfig) {
       const configContent = generateConfigTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         configFilePath,
         configContent,
         config.signatures.typescript
       );
-      createdFiles.push(configFilePath);
+      await registerFile(configFilePath, { kind: 'component-file', template: 'config', hash });
+      writtenFiles.push(configFilePath);
     }
     
     if (shouldCreateConstants) {
       const constantsContent = generateConstantsTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         constantsFilePath,
         constantsContent,
         config.signatures.typescript
       );
-      createdFiles.push(constantsFilePath);
+      await registerFile(constantsFilePath, { kind: 'component-file', template: 'constants', hash });
+      writtenFiles.push(constantsFilePath);
     }
 
     if (shouldCreateApi) {
       const apiContent = generateApiTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         apiFilePath,
         apiContent,
         config.signatures.typescript
       );
-      createdFiles.push(apiFilePath);
+      await registerFile(apiFilePath, { kind: 'component-file', template: 'api', hash });
+      writtenFiles.push(apiFilePath);
     }
 
     if (shouldCreateServices) {
       const servicesContent = generateServiceTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         servicesFilePath,
         servicesContent,
         config.signatures.typescript
       );
-      createdFiles.push(servicesFilePath);
+      await registerFile(servicesFilePath, { kind: 'component-file', template: 'service', hash });
+      writtenFiles.push(servicesFilePath);
     }
 
     if (shouldCreateSchemas) {
       const schemasContent = generateSchemaTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         schemasFilePath,
         schemasContent,
         config.signatures.typescript
       );
-      createdFiles.push(schemasFilePath);
+      await registerFile(schemasFilePath, { kind: 'component-file', template: 'schema', hash });
+      writtenFiles.push(schemasFilePath);
     }
 
     if (shouldCreateReadme) {
       const readmeContent = generateReadmeTemplate(normalizedName);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         readmeFilePath,
         readmeContent,
         config.signatures.astro
       );
-      createdFiles.push(readmeFilePath);
+      await registerFile(readmeFilePath, { kind: 'component-file', template: 'readme', hash });
+      writtenFiles.push(readmeFilePath);
     }
 
     if (shouldCreateStories) {
       const relativePath = `./${normalizedName}${config.naming.componentExtension}`;
       const storiesContent = generateStoriesTemplate(normalizedName, relativePath);
-      await writeFileWithSignature(
+      const hash = await writeFileWithSignature(
         storiesFilePath,
         storiesContent,
         config.signatures.typescript
       );
-      createdFiles.push(storiesFilePath);
+      await registerFile(storiesFilePath, { kind: 'component-file', template: 'stories', hash });
+      writtenFiles.push(storiesFilePath);
+    }
+    
+    // Formatting
+    if (config.formatting.tool !== 'none') {
+        await formatFiles(writtenFiles, config.formatting.tool);
     }
     
     console.log('✓ Component created successfully:');
-    createdFiles.forEach(file => console.log(`  ${file}`));
+    console.log(`  Component: ${componentFilePath}`);
+    console.log(`  Index: ${indexFilePath}`);
     
-    if (shouldCreateSubComponentsDir) {
-      console.log(`  Sub-components: ${subComponentsDir}/`);
-    }
+    if (shouldCreateContext) console.log(`  Context: ${contextFilePath}`);
+    if (shouldCreateHook) console.log(`  Hook: ${hookFilePath}`);
+    if (shouldCreateTests) console.log(`  Tests: ${testFilePath}`);
+    if (shouldCreateConfig) console.log(`  Config: ${configFilePath}`);
+    if (shouldCreateConstants) console.log(`  Constants: ${constantsFilePath}`);
+    if (shouldCreateTypes) console.log(`  Types: ${typesFilePath}`);
+    if (shouldCreateApi) console.log(`  Api: ${apiFilePath}`);
+    if (shouldCreateServices) console.log(`  Services: ${servicesFilePath}`);
+    if (shouldCreateSchemas) console.log(`  Schemas: ${schemasFilePath}`);
+    if (shouldCreateReadme) console.log(`  Readme: ${readmeFilePath}`);
+    if (shouldCreateStories) console.log(`  Stories: ${storiesFilePath}`);
+    if (shouldCreateSubComponentsDir) console.log(`  Sub-components: ${subComponentsDir}/`);
     
     await addComponentToState({
       name: normalizedName,
