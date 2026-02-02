@@ -9,6 +9,8 @@ import { createComponentCommand } from '../src/commands/create-component.js';
 import { removeComponentCommand } from '../src/commands/remove-component.js';
 import { listSectionsCommand } from '../src/commands/list-sections.js';
 import { validateStateCommand } from '../src/commands/validate-state.js';
+import { syncCommand } from '../src/commands/sync.js';
+import { adoptCommand } from '../src/commands/adopt.js';
 
 const program = new Command();
 
@@ -108,5 +110,20 @@ program
   .description('Validate that the state file matches the project files')
   .option('--fix', 'Try to fix state by re-hashing modified files (requires signatures to match)')
   .action(validateStateCommand);
+
+program
+  .command('sync')
+  .description('Synchronize the state with the actual files in managed directories')
+  .option('--include-all', 'Include all files in managed directories, even without Textor signature')
+  .option('--force', 'Update hashes for modified files even without Textor signature')
+  .option('--dry-run', 'Show what would be changed without applying')
+  .action(syncCommand);
+
+program
+  .command('adopt [path]')
+  .description('Adopt untracked files into Textor state, adding signatures')
+  .option('--all', 'Adopt all untracked files in managed directories')
+  .option('--dry-run', 'Show what would be adopted without applying')
+  .action(adoptCommand);
 
 program.parse();

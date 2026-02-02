@@ -51,6 +51,7 @@ export async function createComponentCommand(componentName, options) {
     const schemasDirInside = secureJoin(componentDir, 'schemas');
     
     const {
+      framework,
       createContext: shouldCreateContext,
       createHook: shouldCreateHook,
       createTests: shouldCreateTests,
@@ -128,11 +129,15 @@ export async function createComponentCommand(componentName, options) {
     if (shouldCreateServices) await ensureDir(servicesDirInside);
     if (shouldCreateSchemas) await ensureDir(schemasDirInside);
     
-    const componentContent = generateComponentTemplate(normalizedName);
+    const componentContent = generateComponentTemplate(normalizedName, framework);
+    const signature = config.naming.componentExtension === '.astro' 
+      ? config.signatures.astro 
+      : (config.signatures.tsx || config.signatures.typescript);
+
     const componentHash = await writeFileWithSignature(
       componentFilePath,
       componentContent,
-      config.signatures.astro
+      signature
     );
     await registerFile(componentFilePath, { kind: 'component', template: 'component', hash: componentHash });
     

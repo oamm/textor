@@ -103,3 +103,97 @@ export function findSection(state, identifier) {
 export function findComponent(state, name) {
   return state.components.find(c => c.name === name);
 }
+
+export function reconstructComponents(files, config) {
+  const componentsRoot = (config.paths.components || 'src/components').replace(/\\/g, '/');
+  const components = new Map();
+
+  for (const filePath in files) {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    if (normalizedPath === componentsRoot || normalizedPath.startsWith(componentsRoot + '/')) {
+      const relativePath = normalizedPath === componentsRoot ? '' : normalizedPath.slice(componentsRoot.length + 1);
+      if (relativePath === '') continue; // skip the root itself if it's in files for some reason
+      
+      const parts = relativePath.split('/');
+      if (parts.length >= 1) {
+        const componentName = parts[0];
+        const componentPath = `${componentsRoot}/${componentName}`;
+        if (!components.has(componentName)) {
+          components.set(componentName, {
+            name: componentName,
+            path: componentPath
+          });
+        }
+      }
+    }
+  }
+
+  return Array.from(components.values());
+}
+
+export function reconstructSections(state, config) {
+  const pagesRoot = (config.paths.pages || 'src/pages').replace(/\\/g, '/');
+  const featuresRoot = (config.paths.features || 'src/features').replace(/\\/g, '/');
+  const files = state.files;
+  
+  // Keep existing sections if their files still exist
+  const validSections = (state.sections || []).filter(section => {
+    // Check if route file exists in state.files
+    const routeFile = Object.keys(files).find(f => {
+      const normalizedF = f.replace(/\\/g, '/');
+      const routePath = section.route === '/' ? 'index' : section.route.slice(1);
+      return normalizedF.startsWith(pagesRoot + '/' + routePath + '.') || 
+             normalizedF === pagesRoot + '/' + routePath + '/index.astro'; // nested mode
+    });
+
+    // Check if feature directory has at least one file in state.files
+    const hasFeatureFiles = Object.keys(files).some(f => 
+      f.replace(/\\/g, '/').startsWith(section.featurePath.replace(/\\/g, '/') + '/')
+    );
+
+    return routeFile && hasFeatureFiles;
+  });
+
+  const sections = new Map();
+  validSections.forEach(s => sections.set(s.route, s));
+
+  // Try to discover new sections
+  for (const filePath in files) {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    if (normalizedPath.startsWith(pagesRoot + '/')) {
+      const relativePath = normalizedPath.slice(pagesRoot.length + 1);
+      const route = '/' + relativePath.replace(/\.(astro|ts|js|tsx|jsx)$/, '').replace(/\/index$/, '');
+      const finalRoute = route === '' ? '/' : route;
+
+      if (!sections.has(finalRoute)) {
+        // Try to find a matching feature by name
+        const routeName = path.basename(finalRoute === '/' ? 'index' : finalRoute);
+        // Look for a directory in features with same name or similar
+        const possibleFeaturePath = Object.keys(files).find(f => {
+           const nf = f.replace(/\\/g, '/');
+           return nf.startsWith(featuresRoot + '/') && nf.includes('/' + routeName + '/');
+        });
+
+        if (possibleFeaturePath) {
+           const featurePathParts = possibleFeaturePath.replace(/\\/g, '/').split('/');
+           const featuresBase = path.basename(featuresRoot);
+           const featureIndex = featurePathParts.indexOf(featuresBase) + 1;
+           
+           if (featureIndex > 0 && featureIndex < featurePathParts.length) {
+             const featureName = featurePathParts[featureIndex];
+             const featurePath = `${featuresRoot}/${featureName}`;
+
+             sections.set(finalRoute, {
+               name: featureName,
+               route: finalRoute,
+               featurePath: featurePath,
+               extension: path.extname(filePath)
+             });
+           }
+        }
+      }
+    }
+  }
+
+  return Array.from(sections.values());
+}

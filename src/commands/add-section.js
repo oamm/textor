@@ -74,6 +74,7 @@ export async function addSectionCommand(route, featurePath, options) {
     const schemasDirInside = secureJoin(featureDirPath, 'schemas');
     
     const {
+      framework,
       createSubComponentsDir: shouldCreateSubComponentsDir,
       createScriptsDir: shouldCreateScriptsDir,
       createApi: shouldCreateApi,
@@ -148,7 +149,9 @@ export async function addSectionCommand(route, featurePath, options) {
     let featureImportPath;
     if (config.importAliases.features) {
       const entryPart = effectiveOptions.entry === 'index' ? '' : `/${featureComponentName}`;
-      featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}`;
+      // In Astro, we can often omit the extension for .tsx files, but not for .astro files if using aliases sometimes.
+      // However, to be safe, we use the configured extension.
+      featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}${config.naming.featureExtension}`;
     } else {
       const relativeFeatureFile = getRelativeImportPath(routeFilePath, featureFilePath);
       // Remove extension for import
@@ -176,7 +179,7 @@ export async function addSectionCommand(route, featurePath, options) {
       routeSignature = config.signatures.astro;
     }
     
-    const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath);
+    const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath, framework);
     
     const routeHash = await writeFileWithSignature(
       routeFilePath,
@@ -198,10 +201,14 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateTests) await ensureDir(testsDir);
     if (shouldCreateTypes) await ensureDir(typesDirInside);
 
+    const featureSignature = config.naming.featureExtension === '.astro'
+      ? config.signatures.astro
+      : (config.signatures.tsx || config.signatures.typescript);
+
     const featureHash = await writeFileWithSignature(
       featureFilePath,
       featureContent,
-      config.signatures.astro
+      featureSignature
     );
     await registerFile(featureFilePath, { kind: 'feature', template: 'feature', hash: featureHash });
     writtenFiles.push(featureFilePath);

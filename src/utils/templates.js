@@ -54,9 +54,25 @@ import ${featureComponentName} from '${featureImportPath}';
  * - componentName: Name of the feature component
  * - scriptImportPath: Path to the feature's client-side script
  */
-export function generateFeatureTemplate(componentName, scriptImportPath) {
-  const override = getTemplateOverride('feature', '.astro', { componentName, scriptImportPath });
+export function generateFeatureTemplate(componentName, scriptImportPath, framework = 'astro') {
+  const extension = framework === 'astro' ? '.astro' : '.tsx';
+  const override = getTemplateOverride('feature', extension, { componentName, scriptImportPath });
   if (override) return override;
+
+  if (framework === 'react') {
+    return `export type ${componentName}Props = {
+  // Add props here
+}
+
+export default function ${componentName}({ }: ${componentName}Props) {
+  return (
+    <div className="${componentName.toLowerCase()}">
+      <h1>${componentName}</h1>
+    </div>
+  );
+}
+`;
+  }
 
   const scriptTag = scriptImportPath ? `\n<script src="${scriptImportPath}"></script>` : '';
 
@@ -85,9 +101,25 @@ export function generateScriptsIndexTemplate() {
  * Component Template Variables:
  * - componentName: Name of the component
  */
-export function generateComponentTemplate(componentName) {
-  const override = getTemplateOverride('component', '.astro', { componentName });
+export function generateComponentTemplate(componentName, framework = 'react') {
+  const extension = framework === 'astro' ? '.astro' : '.tsx';
+  const override = getTemplateOverride('component', extension, { componentName });
   if (override) return override;
+
+  if (framework === 'react') {
+    return `export type ${componentName}Props = {
+  // Add props here
+}
+
+export default function ${componentName}({ }: ${componentName}Props) {
+  return (
+    <div className="${componentName.toLowerCase()}">
+      {/* ${componentName} implementation */}
+    </div>
+  );
+}
+`;
+  }
 
   return `---
 export type Props = {
