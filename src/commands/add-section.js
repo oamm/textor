@@ -11,13 +11,15 @@ import {
 import { 
   ensureNotExists, 
   writeFileWithSignature,
-  ensureDir 
+  ensureDir,
+  secureJoin 
 } from '../utils/filesystem.js';
 import { 
   generateRouteTemplate, 
   generateFeatureTemplate,
   generateScriptsIndexTemplate 
 } from '../utils/templates.js';
+import { addSectionToState } from '../utils/state.js';
 
 export async function addSectionCommand(route, featurePath, options) {
   try {
@@ -34,19 +36,19 @@ export async function addSectionCommand(route, featurePath, options) {
     const featuresRoot = resolvePath(config, 'features');
     const layoutsRoot = resolvePath(config, 'layouts');
     
-    const routeFilePath = path.join(pagesRoot, routeFileName);
-    const featureDirPath = path.join(featuresRoot, normalizedFeaturePath);
-    const featureFilePath = path.join(featureDirPath, featureFileName);
-    const scriptsIndexPath = path.join(featureDirPath, config.features.scriptsIndexFile);
-    const componentsDirPath = path.join(featureDirPath, 'Components');
+    const routeFilePath = secureJoin(pagesRoot, routeFileName);
+    const featureDirPath = secureJoin(featuresRoot, normalizedFeaturePath);
+    const featureFilePath = secureJoin(featureDirPath, featureFileName);
+    const scriptsIndexPath = secureJoin(featureDirPath, config.features.scriptsIndexFile);
+    const componentsDirPath = secureJoin(featureDirPath, 'sub-components');
     
     if (options.dryRun) {
       console.log('Dry run - would create:');
       console.log(`  Route: ${routeFilePath}`);
       console.log(`  Feature: ${featureFilePath}`);
       
-      if (config.features.createComponentsDir) {
-        console.log(`  Components: ${componentsDirPath}/`);
+      if (config.features.createSubComponentsDir) {
+        console.log(`  Sub-components: ${componentsDirPath}/`);
       }
       
       if (config.features.createScriptsDir) {
@@ -63,7 +65,7 @@ export async function addSectionCommand(route, featurePath, options) {
     if (config.importAliases.layouts) {
       layoutImportPath = `${config.importAliases.layouts}/${options.layout}.astro`;
     } else {
-      const layoutFilePath = path.join(layoutsRoot, `${options.layout}.astro`);
+      const layoutFilePath = secureJoin(layoutsRoot, `${options.layout}.astro`);
       layoutImportPath = getRelativeImportPath(routeFilePath, layoutFilePath);
     }
 
@@ -75,6 +77,11 @@ export async function addSectionCommand(route, featurePath, options) {
       featureImportPath = `${relativeFeatureDir}/${featureComponentName}`;
     }
     
+    let scriptImportPath;
+    if (config.features.createScriptsDir) {
+      scriptImportPath = getRelativeImportPath(featureFilePath, scriptsIndexPath);
+    }
+
     const routeContent = generateRouteTemplate(
       options.layout,
       layoutImportPath,
@@ -82,7 +89,7 @@ export async function addSectionCommand(route, featurePath, options) {
       featureComponentName
     );
     
-    const featureContent = generateFeatureTemplate(featureComponentName);
+    const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath);
     
     await writeFileWithSignature(
       routeFilePath,
@@ -98,7 +105,7 @@ export async function addSectionCommand(route, featurePath, options) {
       config.signatures.astro
     );
     
-    if (config.features.createComponentsDir) {
+    if (config.features.createSubComponentsDir) {
       await ensureDir(componentsDirPath);
     }
     
@@ -114,13 +121,20 @@ export async function addSectionCommand(route, featurePath, options) {
     console.log(`  Route: ${routeFilePath}`);
     console.log(`  Feature: ${featureFilePath}`);
     
-    if (config.features.createComponentsDir) {
-      console.log(`  Components: ${componentsDirPath}/`);
+    if (config.features.createSubComponentsDir) {
+      console.log(`  Sub-components: ${componentsDirPath}/`);
     }
     
     if (config.features.createScriptsDir) {
       console.log(`  Scripts: ${scriptsIndexPath}`);
     }
+    
+    await addSectionToState({
+      name: options.name || featureComponentName,
+      route: normalizedRoute,
+      featurePath: normalizedFeaturePath,
+      layout: options.layout
+    });
     
   } catch (error) {
     console.error('Error:', error.message);

@@ -51,8 +51,8 @@ describe('New Improvements', () => {
     const output = execSync(`node ${binPath} list-sections`, { cwd: fullTempPath }).toString();
     
     expect(output).toContain('Managed Sections:');
-    expect(output).toContain('- about (about.astro)');
-    expect(output).toContain('Import: ../features/About/About');
+    expect(output).toContain('About [/about] (about.astro)');
+    expect(output).toContain('Feature: About');
   });
 
   it('template overrides work', () => {

@@ -6,7 +6,7 @@ function getTemplateOverride(templateName, data = {}) {
   if (existsSync(overridePath)) {
     let content = readFileSync(overridePath, 'utf-8');
     for (const [key, value] of Object.entries(data)) {
-      content = content.replace(new RegExp(`{{${key}}}`, 'g'), value);
+      content = content.replace(new RegExp(`{{${key}}}`, 'g'), () => value);
     }
     return content;
   }
@@ -33,9 +33,11 @@ import ${featureComponentName} from '${featureImportPath}';
 `;
 }
 
-export function generateFeatureTemplate(componentName) {
-  const override = getTemplateOverride('feature', { componentName });
+export function generateFeatureTemplate(componentName, scriptImportPath) {
+  const override = getTemplateOverride('feature', { componentName, scriptImportPath });
   if (override) return override;
+
+  const scriptTag = scriptImportPath ? `\n<script src="${scriptImportPath}"></script>` : '';
 
   return `---
 // Feature: ${componentName}
@@ -43,7 +45,7 @@ export function generateFeatureTemplate(componentName) {
 
 <div class="${componentName.toLowerCase()}">
   <h1>${componentName}</h1>
-</div>
+</div>${scriptTag}
 `;
 }
 
@@ -148,6 +150,19 @@ export function generateConfigTemplate(componentName) {
 export function generateConstantsTemplate(componentName) {
   return `export const ${componentName.toUpperCase()}_CONSTANTS = {
   // Add constants here
+};
+`;
+}
+
+export function generateIndexTemplate(componentName, componentExtension) {
+  return `export { default as ${componentName} } from './${componentName}${componentExtension}';
+export * from './types';
+`;
+}
+
+export function generateTypesTemplate(componentName) {
+  return `export type ${componentName}Props = {
+  // Add props types here
 };
 `;
 }

@@ -8,7 +8,8 @@ import {
 import { 
   ensureNotExists, 
   writeFileWithSignature,
-  ensureDir 
+  ensureDir,
+  secureJoin 
 } from '../utils/filesystem.js';
 import {
   generateComponentTemplate,
@@ -16,8 +17,11 @@ import {
   generateContextTemplate,
   generateTestTemplate,
   generateConfigTemplate,
-  generateConstantsTemplate
+  generateConstantsTemplate,
+  generateIndexTemplate,
+  generateTypesTemplate
 } from '../utils/templates.js';
+import { addComponentToState } from '../utils/state.js';
 
 export async function createComponentCommand(componentName, options) {
   try {
@@ -27,12 +31,14 @@ export async function createComponentCommand(componentName, options) {
     
     const componentsRoot = resolvePath(config, 'components');
     
-    let componentDir;
-    if (options.componentsDir === false || !config.components.createComponentsDir) {
-      componentDir = path.join(componentsRoot, normalizedName);
-    } else {
-      componentDir = path.join(componentsRoot, normalizedName, 'Components');
-    }
+    const componentDir = secureJoin(componentsRoot, normalizedName);
+    const subComponentsDir = secureJoin(componentDir, 'sub-components');
+    const testsDir = secureJoin(componentDir, '__tests__');
+    const configDirInside = secureJoin(componentDir, 'config');
+    const constantsDirInside = secureJoin(componentDir, 'constants');
+    const contextDirInside = secureJoin(componentDir, 'context');
+    const hooksDirInside = secureJoin(componentDir, 'hooks');
+    const typesDirInside = secureJoin(componentDir, 'types');
     
     const createdFiles = [];
     
@@ -41,36 +47,53 @@ export async function createComponentCommand(componentName, options) {
     const shouldCreateTests = options.tests !== false && config.components.createTests;
     const shouldCreateConfig = options.config !== false && config.components.createConfig;
     const shouldCreateConstants = options.constants !== false && config.components.createConstants;
+    const shouldCreateTypes = config.components.createTypes;
+    const shouldCreateSubComponentsDir = options.subComponentsDir !== false && config.components.createSubComponentsDir;
     
     const componentFilePath = path.join(componentDir, `${normalizedName}${config.naming.componentExtension}`);
-    const contextFilePath = path.join(componentDir, `${normalizedName}Context.tsx`);
-    const hookFilePath = path.join(componentDir, getHookFileName(normalizedName, config.naming.hookExtension));
-    const testFilePath = path.join(componentDir, `${normalizedName}${config.naming.testExtension}`);
-    const configFilePath = path.join(componentDir, `${normalizedName}Config.ts`);
-    const constantsFilePath = path.join(componentDir, `${normalizedName}Constants.ts`);
+    const indexFilePath = path.join(componentDir, 'index.ts');
+    const contextFilePath = path.join(contextDirInside, `${normalizedName}Context.tsx`);
+    const hookFilePath = path.join(hooksDirInside, getHookFileName(normalizedName, config.naming.hookExtension));
+    const testFilePath = path.join(testsDir, `${normalizedName}${config.naming.testExtension}`);
+    const configFilePath = path.join(configDirInside, 'index.ts');
+    const constantsFilePath = path.join(constantsDirInside, 'index.ts');
+    const typesFilePath = path.join(typesDirInside, 'index.ts');
     
     if (options.dryRun) {
       console.log('Dry run - would create:');
       console.log(`  Component: ${componentFilePath}`);
+      console.log(`  Index: ${indexFilePath}`);
       
       if (shouldCreateContext) console.log(`  Context: ${contextFilePath}`);
       if (shouldCreateHook) console.log(`  Hook: ${hookFilePath}`);
       if (shouldCreateTests) console.log(`  Tests: ${testFilePath}`);
       if (shouldCreateConfig) console.log(`  Config: ${configFilePath}`);
       if (shouldCreateConstants) console.log(`  Constants: ${constantsFilePath}`);
+      if (shouldCreateTypes) console.log(`  Types: ${typesFilePath}`);
+      if (shouldCreateSubComponentsDir) console.log(`  Sub-components: ${subComponentsDir}/`);
       
       return;
     }
     
     await ensureNotExists(componentFilePath, options.force);
+    await ensureNotExists(indexFilePath, options.force);
     
     if (shouldCreateContext) await ensureNotExists(contextFilePath, options.force);
     if (shouldCreateHook) await ensureNotExists(hookFilePath, options.force);
     if (shouldCreateTests) await ensureNotExists(testFilePath, options.force);
     if (shouldCreateConfig) await ensureNotExists(configFilePath, options.force);
     if (shouldCreateConstants) await ensureNotExists(constantsFilePath, options.force);
+    if (shouldCreateTypes) await ensureNotExists(typesFilePath, options.force);
     
     await ensureDir(componentDir);
+    
+    if (shouldCreateSubComponentsDir) await ensureDir(subComponentsDir);
+    if (shouldCreateContext) await ensureDir(contextDirInside);
+    if (shouldCreateHook) await ensureDir(hooksDirInside);
+    if (shouldCreateTests) await ensureDir(testsDir);
+    if (shouldCreateConfig) await ensureDir(configDirInside);
+    if (shouldCreateConstants) await ensureDir(constantsDirInside);
+    if (shouldCreateTypes) await ensureDir(typesDirInside);
     
     const componentContent = generateComponentTemplate(normalizedName);
     await writeFileWithSignature(
@@ -79,6 +102,24 @@ export async function createComponentCommand(componentName, options) {
       config.signatures.astro
     );
     createdFiles.push(componentFilePath);
+
+    const indexContent = generateIndexTemplate(normalizedName, config.naming.componentExtension);
+    await writeFileWithSignature(
+      indexFilePath,
+      indexContent,
+      config.signatures.typescript
+    );
+    createdFiles.push(indexFilePath);
+    
+    if (shouldCreateTypes) {
+      const typesContent = generateTypesTemplate(normalizedName);
+      await writeFileWithSignature(
+        typesFilePath,
+        typesContent,
+        config.signatures.typescript
+      );
+      createdFiles.push(typesFilePath);
+    }
     
     if (shouldCreateContext) {
       const contextContent = generateContextTemplate(normalizedName);
@@ -102,7 +143,7 @@ export async function createComponentCommand(componentName, options) {
     }
     
     if (shouldCreateTests) {
-      const relativeComponentPath = `./${normalizedName}${config.naming.componentExtension}`;
+      const relativeComponentPath = `../${normalizedName}${config.naming.componentExtension}`;
       const testContent = generateTestTemplate(normalizedName, relativeComponentPath);
       await writeFileWithSignature(
         testFilePath,
@@ -134,6 +175,15 @@ export async function createComponentCommand(componentName, options) {
     
     console.log('✓ Component created successfully:');
     createdFiles.forEach(file => console.log(`  ${file}`));
+    
+    if (shouldCreateSubComponentsDir) {
+      console.log(`  Sub-components: ${subComponentsDir}/`);
+    }
+    
+    await addComponentToState({
+      name: normalizedName,
+      path: componentDir
+    });
     
   } catch (error) {
     console.error('Error:', error.message);

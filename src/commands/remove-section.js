@@ -9,15 +9,31 @@ import {
 import { 
   safeDelete, 
   safeDeleteDir,
-  cleanupEmptyDirs 
+  cleanupEmptyDirs,
+  secureJoin 
 } from '../utils/filesystem.js';
+import { loadState, findSection, removeSectionFromState } from '../utils/state.js';
 
 export async function removeSectionCommand(route, featurePath, options) {
   try {
     const config = await loadConfig();
+    const state = await loadState();
     
-    const normalizedRoute = normalizeRoute(route);
-    const normalizedFeaturePath = featureToDirectoryPath(featurePath);
+    let targetRoute = route;
+    let targetFeaturePath = featurePath;
+
+    if (!targetFeaturePath) {
+      const section = findSection(state, route);
+      if (section) {
+        targetRoute = section.route;
+        targetFeaturePath = section.featurePath;
+      } else {
+        throw new Error(`Section not found for identifier: ${route}. Please provide both route and featurePath.`);
+      }
+    }
+    
+    const normalizedRoute = normalizeRoute(targetRoute);
+    const normalizedFeaturePath = featureToDirectoryPath(targetFeaturePath);
     
     const routeFileName = routeToFilePath(normalizedRoute, config.naming.routeExtension);
     const featureFileName = getFeatureFileName(normalizedFeaturePath, config.naming.featureExtension);
@@ -25,8 +41,8 @@ export async function removeSectionCommand(route, featurePath, options) {
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
     
-    const routeFilePath = path.join(pagesRoot, routeFileName);
-    const featureDirPath = path.join(featuresRoot, normalizedFeaturePath);
+    const routeFilePath = secureJoin(pagesRoot, routeFileName);
+    const featureDirPath = secureJoin(featuresRoot, normalizedFeaturePath);
     const featureFilePath = path.join(featureDirPath, featureFileName);
     
     const deletedFiles = [];
@@ -91,6 +107,8 @@ export async function removeSectionCommand(route, featurePath, options) {
     
     if (deletedFiles.length === 0 && deletedDirs.length === 0 && skippedFiles.length === 0) {
       console.log('No files to delete.');
+    } else {
+      await removeSectionFromState(normalizedRoute);
     }
     
   } catch (error) {

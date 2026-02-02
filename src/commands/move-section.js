@@ -14,23 +14,68 @@ import {
   safeMove,
   ensureDir,
   updateSignature,
-  cleanupEmptyDirs
+  cleanupEmptyDirs,
+  secureJoin
 } from '../utils/filesystem.js';
+import { loadState, findSection, updateSectionInState } from '../utils/state.js';
 
 export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeature, options) {
   try {
     const config = await loadConfig();
+    const state = await loadState();
+
+    let actualFromRoute = fromRoute;
+    let actualFromFeature = fromFeature;
+    let actualToRoute = toRoute;
+    let actualToFeature = toFeature;
+
+    // Shift arguments if using state
+    if (!toRoute && fromRoute && fromFeature) {
+        // textor move-section /old-route /new-route
+        const section = findSection(state, fromRoute);
+        if (section) {
+            actualFromRoute = section.route;
+            actualFromFeature = section.featurePath;
+            actualToRoute = fromFeature; // the second argument was actually the new route
+            actualToFeature = toRoute; // which is null
+            
+            // If toFeature is not provided, try to derive it from the new route
+            if (!actualToFeature && actualToRoute) {
+                const oldRouteParts = actualFromRoute.split('/').filter(Boolean);
+                const newRouteParts = actualToRoute.split('/').filter(Boolean);
+                const oldFeatureParts = actualFromFeature.split('/').filter(Boolean);
+                
+                // If the feature path starts with the old route parts, replace them
+                let match = true;
+                for (let i = 0; i < oldRouteParts.length; i++) {
+                    if (oldFeatureParts[i] !== oldRouteParts[i]) {
+                        match = false;
+                        break;
+                    }
+                }
+                
+                if (match && oldRouteParts.length > 0) {
+                    actualToFeature = [...newRouteParts, ...oldFeatureParts.slice(oldRouteParts.length)].join('/');
+                } else {
+                    // Otherwise just keep it the same
+                    actualToFeature = actualFromFeature;
+                }
+            }
+        }
+    } else if (!fromFeature && fromRoute) {
+        // Might be just name? but move needs destination.
+    }
+
+    const isRouteOnly = options.keepFeature || (!actualToFeature && actualToRoute && !actualFromFeature);
     
-    const isRouteOnly = options.keepFeature || (!toFeature && toRoute);
-    
-    if (isRouteOnly && !toRoute) {
+    if (isRouteOnly && !actualToRoute) {
       throw new Error('Destination route required for route-only move');
     }
     
-    const normalizedFromRoute = normalizeRoute(fromRoute);
-    const normalizedToRoute = normalizeRoute(toRoute);
-    const normalizedFromFeature = fromFeature ? featureToDirectoryPath(fromFeature) : null;
-    const normalizedToFeature = toFeature ? featureToDirectoryPath(toFeature) : null;
+    const normalizedFromRoute = normalizeRoute(actualFromRoute);
+    const normalizedToRoute = normalizeRoute(actualToRoute);
+    const normalizedFromFeature = actualFromFeature ? featureToDirectoryPath(actualFromFeature) : null;
+    const normalizedToFeature = actualToFeature ? featureToDirectoryPath(actualToFeature) : null;
     
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
@@ -38,8 +83,8 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     const fromRouteFile = routeToFilePath(normalizedFromRoute, config.naming.routeExtension);
     const toRouteFile = routeToFilePath(normalizedToRoute, config.naming.routeExtension);
     
-    const fromRoutePath = path.join(pagesRoot, fromRouteFile);
-    const toRoutePath = path.join(pagesRoot, toRouteFile);
+    const fromRoutePath = secureJoin(pagesRoot, fromRouteFile);
+    const toRoutePath = secureJoin(pagesRoot, toRouteFile);
     
     const movedFiles = [];
     
@@ -48,8 +93,8 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       console.log(`  Route: ${fromRoutePath} -> ${toRoutePath}`);
       
       if (!isRouteOnly && normalizedFromFeature && normalizedToFeature) {
-        const fromFeaturePath = path.join(featuresRoot, normalizedFromFeature);
-        const toFeaturePath = path.join(featuresRoot, normalizedToFeature);
+        const fromFeaturePath = secureJoin(featuresRoot, normalizedFromFeature);
+        const toFeaturePath = secureJoin(featuresRoot, normalizedToFeature);
         console.log(`  Feature: ${fromFeaturePath} -> ${toFeaturePath}`);
       }
       
@@ -62,8 +107,8 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     // Update imports in the moved route file
     const targetFeature = normalizedToFeature || normalizedFromFeature;
     if (targetFeature) {
-      const fromFeatureDirPath = path.join(featuresRoot, normalizedFromFeature);
-      const toFeatureDirPath = path.join(featuresRoot, targetFeature);
+      const fromFeatureDirPath = secureJoin(featuresRoot, normalizedFromFeature);
+      const toFeatureDirPath = secureJoin(featuresRoot, targetFeature);
       const fromFeatureComponentName = getFeatureComponentName(normalizedFromFeature);
       const toFeatureComponentName = getFeatureComponentName(targetFeature);
 
@@ -115,9 +160,9 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       }
     }
     
-    if (!isRouteOnly && normalizedFromFeature && normalizedToFeature) {
-      const fromFeaturePath = path.join(featuresRoot, normalizedFromFeature);
-      const toFeaturePath = path.join(featuresRoot, normalizedToFeature);
+    if (!isRouteOnly && normalizedFromFeature && normalizedToFeature && normalizedFromFeature !== normalizedToFeature) {
+      const fromFeaturePath = secureJoin(featuresRoot, normalizedFromFeature);
+      const toFeaturePath = secureJoin(featuresRoot, normalizedToFeature);
       
       if (existsSync(fromFeaturePath)) {
         await moveDirectory(fromFeaturePath, toFeaturePath, options.force);
@@ -134,6 +179,16 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       console.log(`  ${item.from}`);
       console.log(`  -> ${item.to}`);
     });
+
+    if (movedFiles.length > 0) {
+      const existingSection = findSection(state, normalizedFromRoute);
+      await updateSectionInState(normalizedFromRoute, {
+        name: existingSection ? existingSection.name : getFeatureComponentName(normalizedToFeature || normalizedFromFeature),
+        route: normalizedToRoute,
+        featurePath: normalizedToFeature || normalizedFromFeature,
+        layout: existingSection ? existingSection.layout : 'Main'
+      });
+    }
     
   } catch (error) {
     console.error('Error:', error.message);

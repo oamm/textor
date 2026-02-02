@@ -4,7 +4,12 @@ export function toPascalCase(input) {
   return input
     .split(/[/_-]/)
     .filter(Boolean)
-    .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .map(segment => {
+      if (segment === segment.toUpperCase() && segment.length > 1) {
+        segment = segment.toLowerCase();
+      }
+      return segment.charAt(0).toUpperCase() + segment.slice(1);
+    })
     .join('');
 }
 

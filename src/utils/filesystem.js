@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, unlink, rmdir, rename, readdir, stat } from 'fs/promises';
+import { readFile, writeFile, mkdir, unlink, rmdir, rename, readdir, stat, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 
@@ -49,44 +49,38 @@ export async function safeDelete(filePath, force = false) {
   return { deleted: true };
 }
 
+async function isSafeToDeleteDir(dirPath) {
+  try {
+    const files = await readdir(dirPath);
+    
+    const results = await Promise.all(
+      files.map(async file => {
+        const filePath = path.join(dirPath, file);
+        const stats = await stat(filePath);
+        
+        if (stats.isDirectory()) {
+          return await isSafeToDeleteDir(filePath);
+        }
+        
+        return await isTextorGenerated(filePath);
+      })
+    );
+
+    return results.every(Boolean);
+  } catch {
+    return false;
+  }
+}
+
 export async function safeDeleteDir(dirPath, force = false) {
   if (!existsSync(dirPath)) {
     return { deleted: false, reason: 'not-found' };
   }
 
-  const files = await readdir(dirPath);
+  const isSafe = force || await isSafeToDeleteDir(dirPath);
   
-  if (files.length === 0) {
-    await rmdir(dirPath);
-    return { deleted: true };
-  }
-
-  const allGenerated = await Promise.all(
-    files.map(async file => {
-      const filePath = path.join(dirPath, file);
-      const stats = await stat(filePath);
-      
-      if (stats.isDirectory()) {
-        return false;
-      }
-      
-      return await isTextorGenerated(filePath);
-    })
-  );
-
-  if (allGenerated.every(Boolean) || force) {
-    await Promise.all(
-      files.map(async file => {
-        const filePath = path.join(dirPath, file);
-        const stats = await stat(filePath);
-        
-        if (stats.isFile()) {
-          await unlink(filePath);
-        }
-      })
-    );
-    
-    await rmdir(dirPath);
+  if (isSafe) {
+    await rm(dirPath, { recursive: true, force: true });
     return { deleted: true };
   }
 
@@ -152,6 +146,27 @@ export async function isEmptyDir(dirPath) {
 
   const files = await readdir(dirPath);
   return files.length === 0;
+}
+
+/**
+ * Safely joins path segments and ensures the result is within the basePath.
+ * @param {string} basePath The base directory that must contain the result
+ * @param {...string} segments Path segments to join
+ * @returns {string} The joined path
+ * @throws {Error} If a path traversal attempt is detected
+ */
+export function secureJoin(basePath, ...segments) {
+  const joinedPath = path.join(basePath, ...segments);
+  const resolvedBase = path.resolve(basePath);
+  const resolvedJoined = path.resolve(joinedPath);
+  
+  const relative = path.relative(resolvedBase, resolvedJoined);
+  
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Security error: Path traversal attempt detected: ${joinedPath} is outside of ${basePath}`);
+  }
+  
+  return joinedPath;
 }
 
 export async function cleanupEmptyDirs(dirPath, rootPath) {

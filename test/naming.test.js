@@ -20,6 +20,12 @@ describe('Naming utilities', () => {
     it('handles underscore-separated paths', () => {
       expect(toPascalCase('user_profile')).toBe('UserProfile');
     });
+
+    it('respects existing camelCase or PascalCase', () => {
+      expect(toPascalCase('myComponent')).toBe('MyComponent');
+      expect(toPascalCase('MyComponent')).toBe('MyComponent');
+      expect(toPascalCase('users/MyCatalog')).toBe('UsersMyCatalog');
+    });
   });
 
   describe('toCamelCase', () => {
