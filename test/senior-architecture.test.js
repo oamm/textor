@@ -4,7 +4,6 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { initCommand } from '../src/commands/init.js';
 import { addSectionCommand } from '../src/commands/add-section.js';
-import { createComponentCommand } from '../src/commands/create-component.js';
 import { statusCommand } from '../src/commands/status.js';
 import { calculateHash } from '../src/utils/filesystem.js';
 import { loadState, saveState } from '../src/utils/state.js';

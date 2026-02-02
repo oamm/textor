@@ -146,7 +146,6 @@ export async function ensureDir(dirPath) {
 }
 
 async function isSafeToDeleteDir(dirPath, stateFiles = {}, options = {}) {
-  const { force = false, acceptChanges = false, owner = null } = options;
   try {
     const files = await readdir(dirPath);
     

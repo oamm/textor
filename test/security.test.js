@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync } from 'fs';
+import { rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import path from 'path';
 import { initCommand } from '../src/commands/init.js';
 import { addSectionCommand } from '../src/commands/add-section.js';

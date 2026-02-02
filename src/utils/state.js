@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, rename, open } from 'fs/promises';
+import { readFile, mkdir, rename, open } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 

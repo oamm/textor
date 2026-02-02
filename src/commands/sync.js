@@ -1,5 +1,5 @@
 import path from 'path';
-import { readdir, readFile, stat } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { loadConfig, resolvePath } from '../utils/config.js';
 import { loadState, saveState, reconstructComponents, reconstructSections } from '../utils/state.js';
