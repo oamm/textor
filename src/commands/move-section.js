@@ -177,11 +177,12 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
         if (normalizedFromFeature !== targetFeature) {
           const oldAliasPath = `${config.importAliases.features}/${normalizedFromFeature}`;
           const newAliasPath = `${config.importAliases.features}/${targetFeature}`;
+          const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
           
           // Replace both the path and the component name if they are different
           await updateSignature(toRoutePath, 
-            `import ${fromFeatureComponentName} from '${oldAliasPath}/${fromFeatureComponentName}'`, 
-            `import ${toFeatureComponentName} from '${newAliasPath}/${toFeatureComponentName}'`
+            `import ${fromFeatureComponentName} from '${oldAliasPath}/${fromFeatureComponentName}${ext}'`, 
+            `import ${toFeatureComponentName} from '${newAliasPath}/${toFeatureComponentName}${ext}'`
           );
           
           // Fallback for prefix only replacement
@@ -189,17 +190,19 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
         } else if (fromFeatureComponentName !== toFeatureComponentName) {
           // Name changed but path didn't
           const aliasPath = `${config.importAliases.features}/${targetFeature}`;
+          const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
           await updateSignature(toRoutePath,
-            `import ${fromFeatureComponentName} from '${aliasPath}/${fromFeatureComponentName}'`,
-            `import ${toFeatureComponentName} from '${aliasPath}/${toFeatureComponentName}'`
+            `import ${fromFeatureComponentName} from '${aliasPath}/${fromFeatureComponentName}${ext}'`,
+            `import ${toFeatureComponentName} from '${aliasPath}/${toFeatureComponentName}${ext}'`
           );
         }
       } else {
         const oldRelativeDir = getRelativeImportPath(fromRoutePath, fromFeatureDirPath);
         const newRelativeDir = getRelativeImportPath(toRoutePath, toFeatureDirPath);
+        const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
         
-        const oldImportPath = `import ${fromFeatureComponentName} from '${oldRelativeDir}/${fromFeatureComponentName}'`;
-        const newImportPath = `import ${toFeatureComponentName} from '${newRelativeDir}/${toFeatureComponentName}'`;
+        const oldImportPath = `import ${fromFeatureComponentName} from '${oldRelativeDir}/${fromFeatureComponentName}${ext}'`;
+        const newImportPath = `import ${toFeatureComponentName} from '${newRelativeDir}/${toFeatureComponentName}${ext}'`;
         
         if (oldImportPath !== newImportPath) {
           await updateSignature(toRoutePath, oldImportPath, newImportPath);

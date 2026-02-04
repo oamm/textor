@@ -235,8 +235,12 @@ export async function addSectionCommand(route, featurePath, options) {
       featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}${config.naming.featureExtension}`;
     } else {
       const relativeFeatureFile = getRelativeImportPath(routeFilePath, featureFilePath);
-      // Remove extension for import
-      featureImportPath = relativeFeatureFile.replace(/\.[^/.]+$/, '');
+      // Remove extension for import if it's not an .astro file
+      if (config.naming.featureExtension === '.astro') {
+        featureImportPath = relativeFeatureFile;
+      } else {
+        featureImportPath = relativeFeatureFile.replace(/\.[^/.]+$/, '');
+      }
     }
     
     let scriptImportPath;
