@@ -62,7 +62,7 @@ describe('Move Section with Renaming', () => {
     expect(featureContent).toContain('Feature: NewFeature'); 
     
     const routeContent = await fs.readFile(path.join(TEST_DIR, 'src/pages/new.astro'), 'utf-8');
-    expect(routeContent).toContain("import NewFeature from '../features/NewFeature/NewFeature'");
+    expect(routeContent).toContain("import NewFeature from '../features/NewFeature/NewFeature.astro'");
     expect(routeContent).toContain("<NewFeature />");
   });
 

@@ -60,14 +60,14 @@ describe('Senior Features: kindRules and --scan', () => {
     
     // 2. Create a manual file that imports this feature
     const consumerPath = path.join(TEST_DIR, 'src/consumer.ts');
-    await writeFile(consumerPath, "import OldFeat from './features/old-feat/OldFeat';\n<OldFeat />");
+    await writeFile(consumerPath, "import OldFeat from './features/old-feat/OldFeat.astro';\n<OldFeat />");
 
     // 3. Move section with --scan
     await moveSectionCommand('/old', 'old-feat', '/new', 'new-feat', { scan: true });
 
     // 4. Verify consumer was updated
     const consumerContent = await readFile(consumerPath, 'utf-8');
-    expect(consumerContent).toContain("import NewFeat from './features/new-feat/NewFeat'");
+    expect(consumerContent).toContain("import NewFeat from './features/new-feat/NewFeat.astro'");
     expect(consumerContent).toContain("<NewFeat />");
   });
 
@@ -82,14 +82,14 @@ describe('Senior Features: kindRules and --scan', () => {
     
     // 2. Create a manual file that uses the alias
     const consumerPath = path.join(TEST_DIR, 'src/consumer.ts');
-    await writeFile(consumerPath, "import OldFeat from '@/features/old-feat/OldFeat';\n<OldFeat />");
+    await writeFile(consumerPath, "import OldFeat from '@/features/old-feat/OldFeat.astro';\n<OldFeat />");
 
     // 3. Move section with --scan
     await moveSectionCommand('/old', 'old-feat', '/new', 'new-feat', { scan: true });
 
     // 4. Verify consumer was updated
     const consumerContent = await readFile(consumerPath, 'utf-8');
-    expect(consumerContent).toContain("import NewFeat from '@/features/new-feat/NewFeat'");
+    expect(consumerContent).toContain("import NewFeat from '@/features/new-feat/NewFeat.astro'");
     expect(consumerContent).toContain("<NewFeat />");
   });
 });

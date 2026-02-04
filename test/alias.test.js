@@ -94,14 +94,14 @@ describe('Alias functionality', () => {
     const routePath = path.join(pagesDir, 'test.astro');
     const content = await readFile(routePath, 'utf-8');
     expect(content).toContain("import Main from '../layouts/Main.astro';");
-    expect(content).toContain("import TestFeature from '../features/test-feature/TestFeature';");
+    expect(content).toContain("import TestFeature from '../features/test-feature/TestFeature.astro';");
 
     // Test deep route
     await addSectionCommand('/blog/my-post', 'blog/post-feature', { layout: 'Main' });
     const deepRoutePath = path.join(pagesDir, 'blog', 'my-post.astro');
     const deepContent = await readFile(deepRoutePath, 'utf-8');
     expect(deepContent).toContain("import Main from '../../layouts/Main.astro';");
-    expect(deepContent).toContain("import BlogPostFeature from '../../features/blog/post-feature/BlogPostFeature';");
+    expect(deepContent).toContain("import BlogPostFeature from '../../features/blog/post-feature/BlogPostFeature.astro';");
   });
 
   it('move-section updates relative paths correctly', async () => {
@@ -132,7 +132,7 @@ describe('Alias functionality', () => {
     await addSectionCommand('/old-route', 'old-feature', { layout: 'Main' });
     const oldRoutePath = path.join(pagesDir, 'old-route.astro');
     const oldContent = await readFile(oldRoutePath, 'utf-8');
-    expect(oldContent).toContain("import OldFeature from '../features/old-feature/OldFeature';");
+    expect(oldContent).toContain("import OldFeature from '../features/old-feature/OldFeature.astro';");
 
     // 2. Move it to a deeper route and different feature
     await moveSectionCommand('/old-route', 'old-feature', '/deep/new-route', 'new/feature', {});
@@ -141,7 +141,7 @@ describe('Alias functionality', () => {
     expect(existsSync(newRoutePath)).toBe(true);
     
     const newContent = await readFile(newRoutePath, 'utf-8');
-    expect(newContent).toContain("import NewFeature from '../../features/new/feature/NewFeature';");
+    expect(newContent).toContain("import NewFeature from '../../features/new/feature/NewFeature.astro';");
   });
 
   it('move-section updates relative paths when keeping feature', async () => {
@@ -180,7 +180,7 @@ describe('Alias functionality', () => {
     const content = await readFile(newRoutePath, 'utf-8');
     // From src/pages/a/b/c/new-route.astro to src/features/my-feature/MyFeature
     // Expected: ../../../../features/my-feature/MyFeature
-    expect(content).toContain("import MyFeature from '../../../../features/my-feature/MyFeature';");
+    expect(content).toContain("import MyFeature from '../../../../features/my-feature/MyFeature.astro';");
   });
 
   it('create-component uses type instead of interface', async () => {

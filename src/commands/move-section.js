@@ -292,14 +292,16 @@ async function scanAndReplaceImports(config, state, fromInfo, toInfo, options) {
     let content = await readFile(fullPath, 'utf-8');
     let changed = false;
 
+    const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
+
     // Handle Aliases
     if (config.importAliases.features) {
       const oldAlias = `${config.importAliases.features}/${fromFeaturePath}`;
       const newAlias = `${config.importAliases.features}/${toFeaturePath}`;
       
       // Update component name and path if both changed
-      const oldFullImport = `from '${oldAlias}/${fromComponentName}'`;
-      const newFullImport = `from '${newAlias}/${toComponentName}'`;
+      const oldFullImport = `from '${oldAlias}/${fromComponentName}${ext}'`;
+      const newFullImport = `from '${newAlias}/${toComponentName}${ext}'`;
       
       if (content.includes(oldFullImport)) {
         content = content.replace(new RegExp(oldFullImport.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newFullImport);
@@ -317,8 +319,8 @@ async function scanAndReplaceImports(config, state, fromInfo, toInfo, options) {
       const oldRelPath = getRelativeImportPath(fullPath, fromFeatureDir);
       const newRelPath = getRelativeImportPath(fullPath, toFeatureDir);
       
-      const oldImport = `'${oldRelPath}/${fromComponentName}'`;
-      const newImport = `'${newRelPath}/${toComponentName}'`;
+      const oldImport = `'${oldRelPath}/${fromComponentName}${ext}'`;
+      const newImport = `'${newRelPath}/${toComponentName}${ext}'`;
       
       if (content.includes(oldImport)) {
         content = content.replace(new RegExp(oldImport.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newImport);
