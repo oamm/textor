@@ -1,4 +1,6 @@
 import path from 'path';
+import { rename, readFile, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { loadConfig, resolvePath, getEffectiveOptions } from '../utils/config.js';
 import { 
   normalizeRoute, 
@@ -34,7 +36,7 @@ import {
   generateReadmeTemplate,
   generateStoriesTemplate
 } from '../utils/templates.js';
-import { addSectionToState, registerFile } from '../utils/state.js';
+import { addSectionToState, registerFile, loadState, saveState } from '../utils/state.js';
 import { stageFiles } from '../utils/git.js';
 
 export async function addSectionCommand(route, featurePath, options) {
@@ -45,10 +47,29 @@ export async function addSectionCommand(route, featurePath, options) {
     const normalizedRoute = normalizeRoute(route);
     const normalizedFeaturePath = featureToDirectoryPath(featurePath);
     
+    const pagesRoot = resolvePath(config, 'pages');
+    const featuresRoot = resolvePath(config, 'features');
+    const layoutsRoot = resolvePath(config, 'layouts');
+    
     const routeExtension = options.endpoint ? '.ts' : config.naming.routeExtension;
+    
+    // Check if we should use nested mode even if config says flat
+    // (because the directory already exists, suggesting it should be an index file)
+    let effectiveRoutingMode = config.routing.mode;
+    if (effectiveRoutingMode === 'flat') {
+      const routeDirName = routeToFilePath(normalizedRoute, {
+        extension: '',
+        mode: 'flat'
+      });
+      const routeDirPath = secureJoin(pagesRoot, routeDirName);
+      if (existsSync(routeDirPath)) {
+        effectiveRoutingMode = 'nested';
+      }
+    }
+
     const routeFileName = routeToFilePath(normalizedRoute, {
       extension: routeExtension,
-      mode: config.routing.mode,
+      mode: effectiveRoutingMode,
       indexFile: config.routing.indexFile
     });
     
@@ -57,10 +78,6 @@ export async function addSectionCommand(route, featurePath, options) {
       extension: config.naming.featureExtension,
       strategy: effectiveOptions.entry
     });
-    
-    const pagesRoot = resolvePath(config, 'pages');
-    const featuresRoot = resolvePath(config, 'features');
-    const layoutsRoot = resolvePath(config, 'layouts');
     
     const routeFilePath = secureJoin(pagesRoot, routeFileName);
     const featureDirPath = secureJoin(featuresRoot, normalizedFeaturePath);
@@ -102,10 +119,50 @@ export async function addSectionCommand(route, featurePath, options) {
     const readmeFilePath = path.join(featureDirPath, 'README.md');
     const storiesFilePath = path.join(featureDirPath, `${featureComponentName}.stories.tsx`);
 
+    const routeParts = normalizedRoute.split('/').filter(Boolean);
+    const reorganizations = [];
+
+    if (routeParts.length > 1 && config.routing.mode === 'flat') {
+      const possibleExtensions = ['.astro', '.ts', '.js', '.md', '.mdx', '.html'];
+      for (let i = 1; i < routeParts.length; i++) {
+        const parentRoute = '/' + routeParts.slice(0, i).join('/');
+        
+        for (const ext of possibleExtensions) {
+          const parentRouteFileName = routeToFilePath(parentRoute, {
+            extension: ext,
+            mode: 'flat'
+          });
+          const parentRouteFilePath = secureJoin(pagesRoot, parentRouteFileName);
+          
+          if (existsSync(parentRouteFilePath)) {
+            const indexFile = ext === '.astro' ? config.routing.indexFile : `index${ext}`;
+            const newParentRouteFileName = routeToFilePath(parentRoute, {
+              extension: ext,
+              mode: 'nested',
+              indexFile: indexFile
+            });
+            const newParentRouteFilePath = secureJoin(pagesRoot, newParentRouteFileName);
+            
+            if (!existsSync(newParentRouteFilePath)) {
+              reorganizations.push({
+                from: parentRouteFilePath,
+                to: newParentRouteFilePath,
+                route: parentRoute
+              });
+            }
+          }
+        }
+      }
+    }
+
     if (options.dryRun) {
       console.log('Dry run - would create:');
       console.log(`  Route: ${routeFilePath}`);
       console.log(`  Feature: ${featureFilePath}`);
+
+      for (const reorg of reorganizations) {
+        console.log(`  Reorganize: ${reorg.from} -> ${reorg.to}`);
+      }
       
       if (shouldCreateIndex) console.log(`  Index: ${indexFilePath}`);
       if (shouldCreateSubComponentsDir) console.log(`  Sub-components: ${subComponentsDir}/`);
@@ -121,6 +178,28 @@ export async function addSectionCommand(route, featurePath, options) {
       if (shouldCreateStories) console.log(`  Stories: ${storiesFilePath}`);
       
       return;
+    }
+
+    if (reorganizations.length > 0) {
+      const state = await loadState();
+      for (const reorg of reorganizations) {
+        await ensureDir(path.dirname(reorg.to));
+        await rename(reorg.from, reorg.to);
+        
+        const oldRelative = path.relative(process.cwd(), reorg.from).replace(/\\/g, '/');
+        const newRelative = path.relative(process.cwd(), reorg.to).replace(/\\/g, '/');
+        
+        if (state.files[oldRelative]) {
+          state.files[newRelative] = { ...state.files[oldRelative] };
+          delete state.files[oldRelative];
+        }
+
+        // Update imports in the moved file
+        await updateImportsInFile(reorg.to, reorg.from, reorg.to);
+        
+        console.log(`✓ Reorganized ${oldRelative} to ${newRelative}`);
+      }
+      await saveState(state);
     }
 
     await ensureNotExists(routeFilePath, options.force);
@@ -455,4 +534,37 @@ export async function addSectionCommand(route, featurePath, options) {
     }
     throw error;
   }
+}
+
+async function updateImportsInFile(filePath, oldFilePath, newFilePath) {
+  if (!existsSync(filePath)) return;
+  
+  let content = await readFile(filePath, 'utf-8');
+  const oldDir = path.dirname(oldFilePath);
+  const newDir = path.dirname(newFilePath);
+  
+  if (oldDir === newDir) return;
+  
+  // Find all relative imports
+  const relativeImportRegex = /from\s+['"](\.\.?\/[^'"]+)['"]/g;
+  let match;
+  const replacements = [];
+  
+  while ((match = relativeImportRegex.exec(content)) !== null) {
+    const relativePath = match[1];
+    const absoluteTarget = path.resolve(oldDir, relativePath);
+    const newRelativePath = getRelativeImportPath(newFilePath, absoluteTarget);
+    
+    replacements.push({
+      full: match[0],
+      oldRel: relativePath,
+      newRel: newRelativePath
+    });
+  }
+  
+  for (const repl of replacements) {
+    content = content.replace(repl.full, `from '${repl.newRel}'`);
+  }
+  
+  await writeFile(filePath, content, 'utf-8');
 }
