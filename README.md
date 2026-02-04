@@ -21,7 +21,7 @@ The tool is designed to be production-grade, principal-engineer approved, and op
 
 ```bash
 # In your Astro project
-pnpm add -D textor
+pnpm add -D @oamm/textor
 
 # Initialize configuration
 pnpm textor init
