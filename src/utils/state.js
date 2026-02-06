@@ -189,6 +189,10 @@ export function reconstructComponents(files, config) {
             path: componentPath
           });
         }
+        // Attribute ownership
+        if (!files[filePath].owner) {
+          files[filePath].owner = componentName;
+        }
       }
     }
   }
@@ -232,28 +236,34 @@ export function reconstructSections(state, config) {
 
       if (!sections.has(finalRoute)) {
         // Try to find a matching feature by name
-        const routeName = path.basename(finalRoute === '/' ? 'index' : finalRoute);
+        const routeName = path.basename(finalRoute === '/' ? 'index' : finalRoute).toLowerCase();
         // Look for a directory in features with same name or similar
         const possibleFeaturePath = Object.keys(files).find(f => {
            const nf = f.replace(/\\/g, '/');
-           return nf.startsWith(featuresRoot + '/') && nf.includes('/' + routeName + '/');
+           if (!nf.startsWith(featuresRoot + '/')) return false;
+           const relToFeatures = nf.slice(featuresRoot.length + 1);
+           const segments = relToFeatures.toLowerCase().split('/');
+           return segments.includes(routeName);
         });
 
         if (possibleFeaturePath) {
-           const featurePathParts = possibleFeaturePath.replace(/\\/g, '/').split('/');
-           const featuresBase = path.basename(featuresRoot);
-           const featureIndex = featurePathParts.indexOf(featuresBase) + 1;
-           
-           if (featureIndex > 0 && featureIndex < featurePathParts.length) {
-             const featureName = featurePathParts[featureIndex];
-             const featurePath = `${featuresRoot}/${featureName}`;
+           const relToFeatures = path.dirname(path.relative(featuresRoot, possibleFeaturePath)).replace(/\\/g, '/');
+           const featurePath = relToFeatures === '.' ? featuresRoot : `${featuresRoot}/${relToFeatures}`;
+           const featureName = path.basename(featurePath);
 
-             sections.set(finalRoute, {
-               name: featureName,
-               route: finalRoute,
-               featurePath: featurePath,
-               extension: path.extname(filePath)
-             });
+           sections.set(finalRoute, {
+             name: featureName,
+             route: finalRoute,
+             featurePath: featurePath,
+             extension: path.extname(filePath)
+           });
+
+           // Attribute ownership to discovered files
+           if (!files[filePath].owner) files[filePath].owner = finalRoute;
+           for (const f in files) {
+             if (f.startsWith(featurePath + '/') || f === featurePath) {
+               if (!files[f].owner) files[f].owner = finalRoute;
+             }
            }
         }
       }
