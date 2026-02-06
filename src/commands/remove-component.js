@@ -22,7 +22,7 @@ export async function removeComponentCommand(identifier, options) {
     let componentDir;
 
     if (component) {
-        componentDir = component.path;
+        componentDir = path.resolve(process.cwd(), component.path);
     } else {
         // Fallback: try to guess path if not in state
         const componentsRoot = path.resolve(process.cwd(), config.paths.components);
