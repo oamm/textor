@@ -31,10 +31,12 @@ export const CURRENT_CONFIG_VERSION = 2;
  * @property {string} signatures.typescript
  * @property {string} signatures.javascript
  * @property {Object} features
+ * @property {string} features.framework
  * @property {string} features.entry
  * @property {boolean} features.createSubComponentsDir
  * @property {boolean} features.createScriptsDir
  * @property {string} features.scriptsIndexFile
+ * @property {string} features.layout
  * @property {Object} components
  * @property {boolean} components.createSubComponentsDir
  * @property {boolean} components.createContext
@@ -100,7 +102,8 @@ export const DEFAULT_CONFIG = {
     createTypes: false,
     createReadme: false,
     createStories: false,
-    createIndex: false
+    createIndex: false,
+    layout: 'Main'
   },
   components: {
     framework: 'react',

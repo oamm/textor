@@ -1,4 +1,5 @@
 {
+  "configVersion": 2,
   "paths": {
     "pages": "src/pages",
     "features": "src/features",
@@ -39,7 +40,8 @@
     "createTypes": false,
     "createReadme": false,
     "createStories": false,
-    "createIndex": false
+    "createIndex": false,
+    "layout": "Main"
   },
   "components": {
     "framework": "react",

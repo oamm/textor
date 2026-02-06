@@ -104,6 +104,7 @@ export async function addSectionCommand(route, featurePath, options) {
     
     const {
       framework,
+      layout,
       createSubComponentsDir: shouldCreateSubComponentsDir,
       createScriptsDir: shouldCreateScriptsDir,
       createApi: shouldCreateApi,
@@ -304,11 +305,11 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateScriptsDir) await ensureNotExists(scriptsIndexPath, options.force);
     
     let layoutImportPath = null;
-    if (routeFilePath && options.layout !== 'none') {
+    if (routeFilePath && layout !== 'none') {
       if (config.importAliases.layouts) {
-        layoutImportPath = `${config.importAliases.layouts}/${options.layout}.astro`;
+        layoutImportPath = `${config.importAliases.layouts}/${layout}.astro`;
       } else {
-        const layoutFilePath = secureJoin(layoutsRoot, `${options.layout}.astro`);
+        const layoutFilePath = secureJoin(layoutsRoot, `${layout}.astro`);
         layoutImportPath = getRelativeImportPath(routeFilePath, layoutFilePath);
       }
     }
@@ -345,7 +346,7 @@ export async function addSectionCommand(route, featurePath, options) {
         routeSignature = getSignature(config, 'typescript');
       } else {
         routeContent = generateRouteTemplate(
-          options.layout,
+          layout,
           layoutImportPath,
           featureImportPath,
           featureComponentName,
@@ -617,7 +618,7 @@ export async function addSectionCommand(route, featurePath, options) {
       name: options.name || featureComponentName,
       route: normalizedRoute,
       featurePath: normalizedFeaturePath,
-      layout: options.layout,
+      layout: layout,
       extension: routeExtension
     });
 

@@ -370,7 +370,8 @@ The .textor/config.json file allows full control over the tool's behavior.
     "createTypes": false,
     "createReadme": false,
     "createStories": false,
-    "createIndex": false
+    "createIndex": false,
+    "layout": "Main"
   },
   "components": {
     "framework": "react",

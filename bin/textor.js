@@ -33,7 +33,7 @@ program
   .command('add-section [route] [featurePath]')
   .description('Create a route + feature binding (route optional for standalone features)')
   .option('--preset <name>', 'Scaffolding preset (minimal, standard, senior)')
-  .option('--layout <name>', 'Layout component name (use "none" for no layout)', 'Main')
+  .option('--layout <name>', 'Layout component name (use "none" for no layout)')
   .option('--name <name>', 'Section name for state tracking')
   .option('--endpoint', 'Create an API endpoint (.ts) instead of an Astro page')
   .option('--api', 'Create api directory')
