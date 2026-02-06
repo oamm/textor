@@ -9,3 +9,4 @@ export * from './commands/validate-state.js';
 export * from './commands/status.js';
 export * from './commands/sync.js';
 export * from './commands/adopt.js';
+export * from './commands/upgrade-config.js';

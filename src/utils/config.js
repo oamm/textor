@@ -4,9 +4,11 @@ import path from 'path';
 
 const CONFIG_DIR = '.textor';
 const CONFIG_FILE = 'config.json';
+export const CURRENT_CONFIG_VERSION = 2;
 
 /**
  * @typedef {Object} TextorConfig
+ * @property {number} configVersion
  * @property {Object} paths
  * @property {string} paths.pages
  * @property {string} paths.features
@@ -58,6 +60,7 @@ const CONFIG_FILE = 'config.json';
  * @type {TextorConfig}
  */
 export const DEFAULT_CONFIG = {
+  configVersion: CURRENT_CONFIG_VERSION,
   paths: {
     pages: 'src/pages',
     features: 'src/features',
@@ -261,7 +264,7 @@ export async function loadConfig() {
   try {
     const content = await readFile(configPath, 'utf-8');
     const config = JSON.parse(content);
-    const merged = deepMerge(DEFAULT_CONFIG, config);
+    const merged = mergeConfig(DEFAULT_CONFIG, config);
     validateConfig(merged);
     return merged;
   } catch (error) {
@@ -300,6 +303,39 @@ export async function saveConfig(config, force = false) {
   return configPath;
 }
 
+export function mergeConfig(defaults, config) {
+  return deepMerge(defaults, config);
+}
+
+export function normalizeConfigVersion(config) {
+  if (!config || typeof config !== 'object') return config;
+  if (typeof config.configVersion !== 'number') {
+    return { ...config, configVersion: 1 };
+  }
+  return config;
+}
+
+export function applyConfigMigrations(config) {
+  let current = normalizeConfigVersion(config);
+  let version = current.configVersion || 1;
+  let migrated = { ...current };
+
+  while (version < CURRENT_CONFIG_VERSION) {
+    if (version === 1) {
+      migrated = { ...migrated, configVersion: 2 };
+      version = 2;
+      continue;
+    }
+    break;
+  }
+
+  if (migrated.configVersion !== CURRENT_CONFIG_VERSION) {
+    migrated.configVersion = CURRENT_CONFIG_VERSION;
+  }
+
+  return migrated;
+}
+
 /**
  * Deeply merges source object into target object.
  * @param {Object} target 
@@ -327,9 +363,13 @@ function deepMerge(target, source) {
  * @param {any} config 
  * @throws {Error} If config is invalid
  */
-function validateConfig(config) {
+export function validateConfig(config) {
   if (!config || typeof config !== 'object') {
     throw new Error('Invalid configuration: must be an object');
+  }
+
+  if (config.configVersion !== undefined && typeof config.configVersion !== 'number') {
+    throw new Error('Invalid configuration: "configVersion" must be a number');
   }
 
   const requiredSections = ['paths', 'naming', 'signatures', 'importAliases'];

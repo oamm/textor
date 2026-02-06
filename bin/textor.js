@@ -12,6 +12,7 @@ import { validateStateCommand } from '../src/commands/validate-state.js';
 import { statusCommand } from '../src/commands/status.js';
 import { syncCommand } from '../src/commands/sync.js';
 import { adoptCommand } from '../src/commands/adopt.js';
+import { upgradeConfigCommand } from '../src/commands/upgrade-config.js';
 
 const program = new Command();
 
@@ -131,5 +132,11 @@ program
   .option('--all', 'Adopt all untracked files in managed directories')
   .option('--dry-run', 'Show what would be adopted without applying')
   .action(adoptCommand);
+
+program
+  .command('upgrade-config')
+  .description('Upgrade Textor configuration to the latest version')
+  .option('--dry-run', 'Show the upgraded config without writing to disk')
+  .action(upgradeConfigCommand);
 
 program.parse();

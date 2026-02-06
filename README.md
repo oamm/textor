@@ -259,6 +259,16 @@ pnpm textor adopt /users
 pnpm textor adopt --all
 ```
 
+### upgrade-config
+Upgrade `.textor/config.json` to the latest schema version without recreating it.
+
+```bash
+pnpm textor upgrade-config
+```
+
+**Options:**
+- `--dry-run`: Print the upgraded config without writing it.
+
 ## 🏗️ Technical Architecture
 
 Textor is designed with enterprise-grade robustness, moving beyond simple scaffolding to provide a reliable refactoring engine.
@@ -305,9 +315,11 @@ When moving or renaming sections, Textor performs scoped AST-like updates:
 ## ⚙️ Configuration
 
 The .textor/config.json file allows full control over the tool's behavior.
+`configVersion` tracks schema changes and is updated by `textor upgrade-config`.
 
 ```json
 {
+  "configVersion": 2,
   "paths": {
     "pages": "src/pages",
     "features": "src/features",
