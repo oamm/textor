@@ -13,6 +13,7 @@ import {
   secureJoin,
   formatFiles 
 } from '../utils/filesystem.js';
+import { resolvePatternedPath } from '../utils/patterns.js';
 import {
   generateComponentTemplate,
   generateHookTemplate,
@@ -67,20 +68,102 @@ export async function createComponentCommand(componentName, options) {
       createReadme: shouldCreateReadme,
       createStories: shouldCreateStories
     } = effectiveOptions;
+
+    const componentPatterns = config.filePatterns?.components || {};
+    const patternData = {
+      componentName: normalizedName,
+      hookName: getHookFunctionName(normalizedName),
+      hookExtension: config.naming.hookExtension,
+      testExtension: config.naming.testExtension,
+      componentExtension: config.naming.componentExtension,
+      featureExtension: config.naming.featureExtension
+    };
     
     const componentFilePath = path.join(componentDir, `${normalizedName}${config.naming.componentExtension}`);
-    const indexFilePath = path.join(componentDir, 'index.ts');
-    const contextFilePath = path.join(contextDirInside, `${normalizedName}Context.tsx`);
-    const hookFilePath = path.join(hooksDirInside, getHookFileName(normalizedName, config.naming.hookExtension));
-    const testFilePath = path.join(testsDir, `${normalizedName}${config.naming.testExtension}`);
-    const configFilePath = path.join(configDirInside, 'index.ts');
-    const constantsFilePath = path.join(constantsDirInside, 'index.ts');
-    const typesFilePath = path.join(typesDirInside, 'index.ts');
-    const apiFilePath = path.join(apiDirInside, 'index.ts');
-    const servicesFilePath = path.join(servicesDirInside, 'index.ts');
-    const schemasFilePath = path.join(schemasDirInside, 'index.ts');
-    const readmeFilePath = path.join(componentDir, 'README.md');
-    const storiesFilePath = path.join(componentDir, `${normalizedName}.stories.tsx`);
+    const indexFilePath = resolvePatternedPath(
+      componentDir,
+      componentPatterns.index,
+      patternData,
+      'index.ts',
+      'filePatterns.components.index'
+    );
+    const contextFilePath = resolvePatternedPath(
+      contextDirInside,
+      componentPatterns.context,
+      patternData,
+      `${normalizedName}Context.tsx`,
+      'filePatterns.components.context'
+    );
+    const hookFilePath = resolvePatternedPath(
+      hooksDirInside,
+      componentPatterns.hook,
+      patternData,
+      getHookFileName(normalizedName, config.naming.hookExtension),
+      'filePatterns.components.hook'
+    );
+    const testFilePath = resolvePatternedPath(
+      testsDir,
+      componentPatterns.test,
+      patternData,
+      `${normalizedName}${config.naming.testExtension}`,
+      'filePatterns.components.test'
+    );
+    const configFilePath = resolvePatternedPath(
+      configDirInside,
+      componentPatterns.config,
+      patternData,
+      'index.ts',
+      'filePatterns.components.config'
+    );
+    const constantsFilePath = resolvePatternedPath(
+      constantsDirInside,
+      componentPatterns.constants,
+      patternData,
+      'index.ts',
+      'filePatterns.components.constants'
+    );
+    const typesFilePath = resolvePatternedPath(
+      typesDirInside,
+      componentPatterns.types,
+      patternData,
+      'index.ts',
+      'filePatterns.components.types'
+    );
+    const apiFilePath = resolvePatternedPath(
+      apiDirInside,
+      componentPatterns.api,
+      patternData,
+      'index.ts',
+      'filePatterns.components.api'
+    );
+    const servicesFilePath = resolvePatternedPath(
+      servicesDirInside,
+      componentPatterns.services,
+      patternData,
+      'index.ts',
+      'filePatterns.components.services'
+    );
+    const schemasFilePath = resolvePatternedPath(
+      schemasDirInside,
+      componentPatterns.schemas,
+      patternData,
+      'index.ts',
+      'filePatterns.components.schemas'
+    );
+    const readmeFilePath = resolvePatternedPath(
+      componentDir,
+      componentPatterns.readme,
+      patternData,
+      'README.md',
+      'filePatterns.components.readme'
+    );
+    const storiesFilePath = resolvePatternedPath(
+      componentDir,
+      componentPatterns.stories,
+      patternData,
+      `${normalizedName}.stories.tsx`,
+      'filePatterns.components.stories'
+    );
     
     if (options.dryRun) {
       console.log('Dry run - would create:');

@@ -43,6 +43,9 @@ const CONFIG_FILE = 'config.json';
  * @property {boolean} components.createTypes
  * @property {Object} formatting
  * @property {string} formatting.tool
+ * @property {Object} filePatterns
+ * @property {Object} filePatterns.features
+ * @property {Object} filePatterns.components
  * @property {Object} git
  * @property {boolean} git.requireCleanRepo
  * @property {boolean} git.stageChanges
@@ -113,6 +116,34 @@ export const DEFAULT_CONFIG = {
   },
   formatting: {
     tool: 'none' // 'prettier' | 'biome' | 'none'
+  },
+  filePatterns: {
+    features: {
+      index: 'index.ts',
+      types: 'index.ts',
+      api: 'index.ts',
+      services: 'index.ts',
+      schemas: 'index.ts',
+      hook: '{{hookName}}{{hookExtension}}',
+      context: '{{componentName}}Context.tsx',
+      test: '{{componentName}}{{testExtension}}',
+      readme: 'README.md',
+      stories: '{{componentName}}.stories.tsx'
+    },
+    components: {
+      index: 'index.ts',
+      types: 'index.ts',
+      api: 'index.ts',
+      services: 'index.ts',
+      schemas: 'index.ts',
+      hook: '{{hookName}}{{hookExtension}}',
+      context: '{{componentName}}Context.tsx',
+      test: '{{componentName}}{{testExtension}}',
+      config: 'index.ts',
+      constants: 'index.ts',
+      readme: 'README.md',
+      stories: '{{componentName}}.stories.tsx'
+    }
   },
   hashing: {
     normalization: 'normalizeEOL', // 'none' | 'normalizeEOL' | 'stripGeneratedRegions'
@@ -310,6 +341,16 @@ function validateConfig(config) {
 
   if (config.kindRules && !Array.isArray(config.kindRules)) {
     throw new Error('Invalid configuration: "kindRules" must be an array');
+  }
+
+  if (config.filePatterns && typeof config.filePatterns !== 'object') {
+    throw new Error('Invalid configuration: "filePatterns" must be an object');
+  }
+  if (config.filePatterns?.features && typeof config.filePatterns.features !== 'object') {
+    throw new Error('Invalid configuration: "filePatterns.features" must be an object');
+  }
+  if (config.filePatterns?.components && typeof config.filePatterns.components !== 'object') {
+    throw new Error('Invalid configuration: "filePatterns.components" must be an object');
   }
 
   // Validate paths are strings

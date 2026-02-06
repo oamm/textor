@@ -20,6 +20,7 @@ import {
   secureJoin,
   formatFiles
 } from '../utils/filesystem.js';
+import { resolvePatternedPath } from '../utils/patterns.js';
 import { 
   generateRouteTemplate, 
   generateFeatureTemplate,
@@ -116,16 +117,86 @@ export async function addSectionCommand(route, featurePath, options) {
       createIndex: shouldCreateIndex
     } = effectiveOptions;
 
-    const indexFilePath = path.join(featureDirPath, 'index.ts');
-    const contextFilePath = path.join(contextDirInside, `${featureComponentName}Context.tsx`);
-    const hookFilePath = path.join(hooksDirInside, getHookFileName(featureComponentName, config.naming.hookExtension));
-    const testFilePath = path.join(testsDir, `${featureComponentName}${config.naming.testExtension}`);
-    const typesFilePath = path.join(typesDirInside, 'index.ts');
-    const apiFilePath = path.join(apiDirInside, 'index.ts');
-    const servicesFilePath = path.join(servicesDirInside, 'index.ts');
-    const schemasFilePath = path.join(schemasDirInside, 'index.ts');
-    const readmeFilePath = path.join(featureDirPath, 'README.md');
-    const storiesFilePath = path.join(featureDirPath, `${featureComponentName}.stories.tsx`);
+    const featurePatterns = config.filePatterns?.features || {};
+    const patternData = {
+      componentName: featureComponentName,
+      hookName: getHookFunctionName(featureComponentName),
+      hookExtension: config.naming.hookExtension,
+      testExtension: config.naming.testExtension,
+      featureExtension: config.naming.featureExtension,
+      componentExtension: config.naming.componentExtension
+    };
+
+    const indexFilePath = resolvePatternedPath(
+      featureDirPath,
+      featurePatterns.index,
+      patternData,
+      'index.ts',
+      'filePatterns.features.index'
+    );
+    const contextFilePath = resolvePatternedPath(
+      contextDirInside,
+      featurePatterns.context,
+      patternData,
+      `${featureComponentName}Context.tsx`,
+      'filePatterns.features.context'
+    );
+    const hookFilePath = resolvePatternedPath(
+      hooksDirInside,
+      featurePatterns.hook,
+      patternData,
+      getHookFileName(featureComponentName, config.naming.hookExtension),
+      'filePatterns.features.hook'
+    );
+    const testFilePath = resolvePatternedPath(
+      testsDir,
+      featurePatterns.test,
+      patternData,
+      `${featureComponentName}${config.naming.testExtension}`,
+      'filePatterns.features.test'
+    );
+    const typesFilePath = resolvePatternedPath(
+      typesDirInside,
+      featurePatterns.types,
+      patternData,
+      'index.ts',
+      'filePatterns.features.types'
+    );
+    const apiFilePath = resolvePatternedPath(
+      apiDirInside,
+      featurePatterns.api,
+      patternData,
+      'index.ts',
+      'filePatterns.features.api'
+    );
+    const servicesFilePath = resolvePatternedPath(
+      servicesDirInside,
+      featurePatterns.services,
+      patternData,
+      'index.ts',
+      'filePatterns.features.services'
+    );
+    const schemasFilePath = resolvePatternedPath(
+      schemasDirInside,
+      featurePatterns.schemas,
+      patternData,
+      'index.ts',
+      'filePatterns.features.schemas'
+    );
+    const readmeFilePath = resolvePatternedPath(
+      featureDirPath,
+      featurePatterns.readme,
+      patternData,
+      'README.md',
+      'filePatterns.features.readme'
+    );
+    const storiesFilePath = resolvePatternedPath(
+      featureDirPath,
+      featurePatterns.stories,
+      patternData,
+      `${featureComponentName}.stories.tsx`,
+      'filePatterns.features.stories'
+    );
 
     const routeParts = normalizedRoute ? normalizedRoute.split('/').filter(Boolean) : [];
     const reorganizations = [];
