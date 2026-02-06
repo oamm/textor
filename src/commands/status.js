@@ -1,71 +1,13 @@
-import path from 'path';
-import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { loadConfig, resolvePath } from '../utils/config.js';
+import { loadConfig } from '../utils/config.js';
 import { loadState } from '../utils/state.js';
-import { calculateHash, isTextorGenerated, scanDirectory } from '../utils/filesystem.js';
+import { getProjectStatus } from '../utils/status.js';
 
 export async function statusCommand() {
   try {
     const config = await loadConfig();
     const state = await loadState();
     
-    const results = {
-      missing: [],
-      modified: [],
-      untracked: [], // Has signature, not in state
-      orphaned: [],  // No signature, not in state
-      synced: 0
-    };
-
-    const roots = [
-      resolvePath(config, 'pages'),
-      resolvePath(config, 'features'),
-      resolvePath(config, 'components')
-    ].map(p => path.resolve(p));
-
-    const diskFiles = new Set();
-    const configSignatures = Object.values(config.signatures || {});
-
-    for (const root of roots) {
-      if (existsSync(root)) {
-        await scanDirectory(root, diskFiles);
-      }
-    }
-
-    // 1. Check state files against disk
-    for (const relativePath in state.files) {
-      const fullPath = path.join(process.cwd(), relativePath);
-      
-      if (!existsSync(fullPath)) {
-        results.missing.push(relativePath);
-        continue;
-      }
-
-      diskFiles.delete(relativePath);
-
-      const content = await readFile(fullPath, 'utf-8');
-      const currentHash = calculateHash(content, config.hashing?.normalization);
-      const fileData = state.files[relativePath];
-
-      if (currentHash !== fileData.hash) {
-        results.modified.push(relativePath);
-      } else {
-        results.synced++;
-      }
-    }
-
-    // 2. Check remaining disk files
-    for (const relativePath of diskFiles) {
-      const fullPath = path.join(process.cwd(), relativePath);
-      const isGenerated = await isTextorGenerated(fullPath, configSignatures);
-      
-      if (isGenerated) {
-        results.untracked.push(relativePath);
-      } else {
-        results.orphaned.push(relativePath);
-      }
-    }
+    const results = await getProjectStatus(config, state);
 
     // Reporting
     console.log('Textor Status Report:');

@@ -279,6 +279,20 @@ pnpm textor normalize-state
 **Options:**
 - `--dry-run`: Print the normalized state without writing it.
 
+### prune-missing
+Remove missing references from Textor state. This command identifies files that are tracked in the state but are no longer present on disk and removes them from `.textor/state.json`. 
+
+**Safe-by-default**: This command never deletes any files from your disk; it only updates the state tracker.
+
+```bash
+pnpm textor prune-missing
+```
+
+**Options:**
+- `--dry-run`: Preview what would be removed from the state without making changes.
+- `--yes`: Skip confirmation prompt.
+- `--no-interactive`: Disable interactive prompts (useful for CI).
+
 ## 🏗️ Technical Architecture
 
 Textor is designed with enterprise-grade robustness, moving beyond simple scaffolding to provide a reliable refactoring engine.

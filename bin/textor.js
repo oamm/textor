@@ -14,6 +14,7 @@ import { syncCommand } from '../src/commands/sync.js';
 import { adoptCommand } from '../src/commands/adopt.js';
 import { upgradeConfigCommand } from '../src/commands/upgrade-config.js';
 import { normalizeStateCommand } from '../src/commands/normalize-state.js';
+import { pruneMissingCommand } from '../src/commands/prune-missing.js';
 
 const program = new Command();
 
@@ -151,5 +152,13 @@ program
   .description('Normalize state paths to be project-relative')
   .option('--dry-run', 'Show the normalized state without writing to disk')
   .action(normalizeStateCommand);
+
+program
+  .command('prune-missing')
+  .description('Remove missing files from state (files that are in state but not on disk)')
+  .option('--dry-run', 'Show what would be removed without applying')
+  .option('--yes', 'Skip confirmation')
+  .option('--no-interactive', 'Disable interactive prompts')
+  .action(pruneMissingCommand);
 
 program.parse();
