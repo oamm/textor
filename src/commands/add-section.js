@@ -341,13 +341,14 @@ export async function addSectionCommand(route, featurePath, options) {
           options.layout,
           layoutImportPath,
           featureImportPath,
-          featureComponentName
+          featureComponentName,
+          routeExtension
         );
         routeSignature = getSignature(config, 'astro');
       }
     }
     
-    const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath, framework);
+    const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath, framework, config.naming.featureExtension);
     
     const writtenFiles = [];
 

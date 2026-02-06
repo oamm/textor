@@ -1,12 +1,31 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
+import { toPascalCase, toCamelCase, toKebabCase, toSnakeCase, toScreamingSnakeCase } from './naming.js';
+
+function enrichData(data) {
+  const enriched = { ...data };
+  const nameKeys = ['componentName', 'featureComponentName', 'layoutName'];
+  for (const key of nameKeys) {
+    if (data[key] && typeof data[key] === 'string') {
+      enriched[`${key}Camel`] = toCamelCase(data[key]);
+      enriched[`${key}Kebab`] = toKebabCase(data[key]);
+      enriched[`${key}Snake`] = toSnakeCase(data[key]);
+      enriched[`${key}Upper`] = toScreamingSnakeCase(data[key]);
+      enriched[`${key}Pascal`] = toPascalCase(data[key]);
+    }
+  }
+  return enriched;
+}
 
 function getTemplateOverride(templateName, extension, data = {}) {
   const overridePath = path.join(process.cwd(), '.textor', 'templates', `${templateName}${extension}`);
   if (existsSync(overridePath)) {
     let content = readFileSync(overridePath, 'utf-8');
-    for (const [key, value] of Object.entries(data)) {
-      content = content.replace(new RegExp(`{{${key}}}`, 'g'), () => value || '');
+    const finalData = enrichData(data);
+    for (const [key, value] of Object.entries(finalData)) {
+      const replacement = () => value || '';
+      content = content.replace(new RegExp(`{{${key}}}`, 'g'), replacement);
+      content = content.replace(new RegExp(`__${key}__`, 'g'), replacement);
     }
     return content;
   }
@@ -20,8 +39,8 @@ function getTemplateOverride(templateName, extension, data = {}) {
  * - featureImportPath: Path to import the feature component
  * - featureComponentName: Name of the feature component
  */
-export function generateRouteTemplate(layoutName, layoutImportPath, featureImportPath, featureComponentName) {
-  const override = getTemplateOverride('route', '.astro', {
+export function generateRouteTemplate(layoutName, layoutImportPath, featureImportPath, featureComponentName, extension = '.astro') {
+  const override = getTemplateOverride('route', extension, {
     layoutName,
     layoutImportPath,
     featureImportPath,
@@ -54,9 +73,9 @@ import ${featureComponentName} from '${featureImportPath}';
  * - componentName: Name of the feature component
  * - scriptImportPath: Path to the feature's client-side script
  */
-export function generateFeatureTemplate(componentName, scriptImportPath, framework = 'astro') {
-  const extension = framework === 'astro' ? '.astro' : '.tsx';
-  const override = getTemplateOverride('feature', extension, { componentName, scriptImportPath });
+export function generateFeatureTemplate(componentName, scriptImportPath, framework = 'astro', extension) {
+  const templateExtension = extension || (framework === 'astro' ? '.astro' : '.tsx');
+  const override = getTemplateOverride('feature', templateExtension, { componentName, scriptImportPath });
   if (override) return override;
 
   if (framework === 'react') {
@@ -101,9 +120,9 @@ export function generateScriptsIndexTemplate() {
  * Component Template Variables:
  * - componentName: Name of the component
  */
-export function generateComponentTemplate(componentName, framework = 'react') {
-  const extension = framework === 'astro' ? '.astro' : '.tsx';
-  const override = getTemplateOverride('component', extension, { componentName });
+export function generateComponentTemplate(componentName, framework = 'react', extension) {
+  const templateExtension = extension || (framework === 'astro' ? '.astro' : '.tsx');
+  const override = getTemplateOverride('component', templateExtension, { componentName });
   if (override) return override;
 
   if (framework === 'react') {

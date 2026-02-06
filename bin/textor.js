@@ -26,6 +26,7 @@ program
   .command('init')
   .description('Initialize Textor configuration')
   .option('--force', 'Overwrite existing configuration')
+  .option('--quiet', 'Skip printing full default configuration')
   .action(initCommand);
 
 program

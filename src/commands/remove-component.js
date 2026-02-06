@@ -48,13 +48,14 @@ export async function removeComponentCommand(identifier, options) {
       await cleanupEmptyDirs(path.dirname(componentDir), path.join(process.cwd(), config.paths.components));
       
       // Unregister files
-      const dirPrefix = path.relative(process.cwd(), componentDir).replace(/\\/g, '/') + '/';
+      const relComponentPath = path.relative(process.cwd(), componentDir).replace(/\\/g, '/');
+      const dirPrefix = relComponentPath + '/';
       for (const f in state.files) {
         if (f.startsWith(dirPrefix)) {
           delete state.files[f];
         }
       }
-      state.components = state.components.filter(c => c.name !== identifier && c.path !== componentDir);
+      state.components = state.components.filter(c => c.name !== identifier && c.path !== relComponentPath);
       await saveState(state);
     } else if (result.message) {
       console.log(`⚠ Skipped: ${componentDir}`);

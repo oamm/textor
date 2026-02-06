@@ -214,7 +214,7 @@ export async function createComponentCommand(componentName, options) {
     if (shouldCreateServices) await ensureDir(servicesDirInside);
     if (shouldCreateSchemas) await ensureDir(schemasDirInside);
     
-    const componentContent = generateComponentTemplate(normalizedName, framework);
+    const componentContent = generateComponentTemplate(normalizedName, framework, config.naming.componentExtension);
     const signature = getSignature(config, config.naming.componentExtension === '.astro' ? 'astro' : 'tsx');
 
     const componentHash = await writeFileWithSignature(
