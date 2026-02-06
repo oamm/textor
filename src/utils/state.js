@@ -19,6 +19,7 @@ export async function loadState() {
     const content = await readFile(statePath, 'utf-8');
     const state = JSON.parse(content);
     if (!state.files) state.files = {};
+    normalizeStatePaths(state);
     return state;
   } catch (error) {
     return { sections: [], components: [], files: {} };
@@ -81,13 +82,17 @@ export async function getFileData(filePath) {
 
 export async function addSectionToState(section) {
   const state = await loadState();
-  // Avoid duplicates by route OR by featurePath if route is null
-  if (section.route) {
-    state.sections = state.sections.filter(s => s.route !== section.route);
-  } else {
-    state.sections = state.sections.filter(s => s.featurePath !== section.featurePath || s.route);
+  const normalizedSection = { ...section };
+  if (normalizedSection.featurePath) {
+    normalizedSection.featurePath = normalizeStatePath(normalizedSection.featurePath);
   }
-  state.sections.push(section);
+  // Avoid duplicates by route OR by featurePath if route is null
+  if (normalizedSection.route) {
+    state.sections = state.sections.filter(s => s.route !== normalizedSection.route);
+  } else {
+    state.sections = state.sections.filter(s => s.featurePath !== normalizedSection.featurePath || s.route);
+  }
+  state.sections.push(normalizedSection);
   await saveState(state);
 }
 
@@ -99,17 +104,55 @@ export async function removeSectionFromState(route) {
 
 export async function updateSectionInState(oldRoute, newSection) {
   const state = await loadState();
+  const normalizedSection = { ...newSection };
+  if (normalizedSection.featurePath) {
+    normalizedSection.featurePath = normalizeStatePath(normalizedSection.featurePath);
+  }
   state.sections = state.sections.filter(s => s.route !== oldRoute);
-  state.sections.push(newSection);
+  state.sections.push(normalizedSection);
   await saveState(state);
 }
 
 export async function addComponentToState(component) {
   const state = await loadState();
+  const normalizedComponent = { ...component };
+  if (normalizedComponent.path) {
+    normalizedComponent.path = normalizeStatePath(normalizedComponent.path);
+  }
   // Avoid duplicates by name
-  state.components = state.components.filter(c => c.name !== component.name);
-  state.components.push(component);
+  state.components = state.components.filter(c => c.name !== normalizedComponent.name);
+  state.components.push(normalizedComponent);
   await saveState(state);
+}
+
+function normalizeStatePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') return filePath;
+  const relative = path.isAbsolute(filePath)
+    ? path.relative(process.cwd(), filePath)
+    : filePath;
+  return relative.replace(/\\/g, '/');
+}
+
+function normalizeStatePaths(state) {
+  if (!state || typeof state !== 'object') return;
+  if (Array.isArray(state.sections)) {
+    state.sections = state.sections.map(section => {
+      if (!section || typeof section !== 'object') return section;
+      if (!section.featurePath) return section;
+      const normalized = normalizeStatePath(section.featurePath);
+      if (normalized === section.featurePath) return section;
+      return { ...section, featurePath: normalized };
+    });
+  }
+  if (Array.isArray(state.components)) {
+    state.components = state.components.map(component => {
+      if (!component || typeof component !== 'object') return component;
+      if (!component.path) return component;
+      const normalized = normalizeStatePath(component.path);
+      if (normalized === component.path) return component;
+      return { ...component, path: normalized };
+    });
+  }
 }
 
 export async function removeComponentFromState(name) {

@@ -269,6 +269,16 @@ pnpm textor upgrade-config
 **Options:**
 - `--dry-run`: Print the upgraded config without writing it.
 
+### normalize-state
+Normalize `.textor/state.json` to use project-relative paths (helpful when moving between machines).
+
+```bash
+pnpm textor normalize-state
+```
+
+**Options:**
+- `--dry-run`: Print the normalized state without writing it.
+
 ## 🏗️ Technical Architecture
 
 Textor is designed with enterprise-grade robustness, moving beyond simple scaffolding to provide a reliable refactoring engine.

@@ -13,6 +13,7 @@ import { statusCommand } from '../src/commands/status.js';
 import { syncCommand } from '../src/commands/sync.js';
 import { adoptCommand } from '../src/commands/adopt.js';
 import { upgradeConfigCommand } from '../src/commands/upgrade-config.js';
+import { normalizeStateCommand } from '../src/commands/normalize-state.js';
 
 const program = new Command();
 
@@ -138,5 +139,11 @@ program
   .description('Upgrade Textor configuration to the latest version')
   .option('--dry-run', 'Show the upgraded config without writing to disk')
   .action(upgradeConfigCommand);
+
+program
+  .command('normalize-state')
+  .description('Normalize state paths to be project-relative')
+  .option('--dry-run', 'Show the normalized state without writing to disk')
+  .action(normalizeStateCommand);
 
 program.parse();
