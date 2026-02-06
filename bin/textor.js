@@ -48,6 +48,11 @@ program
   .option('--index', 'Create index.ts')
   .option('--no-sub-components-dir', 'Skip creating sub-components directory')
   .option('--no-scripts-dir', 'Skip creating scripts directory')
+  .option('--prop <key=value>', 'Layout property', (val, memo) => {
+    const [key, ...rest] = val.split('=');
+    memo[key] = rest.join('=');
+    return memo;
+  }, {})
   .option('--dry-run', 'Show what would be created without creating')
   .option('--force', 'Overwrite existing files')
   .action(addSectionCommand);

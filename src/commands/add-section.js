@@ -36,7 +36,8 @@ import {
   generateServiceTemplate,
   generateSchemaTemplate,
   generateReadmeTemplate,
-  generateStoriesTemplate
+  generateStoriesTemplate,
+  enrichData
 } from '../utils/templates.js';
 import { addSectionToState, registerFile, loadState, saveState } from '../utils/state.js';
 import { stageFiles } from '../utils/git.js';
@@ -105,6 +106,7 @@ export async function addSectionCommand(route, featurePath, options) {
     const {
       framework,
       layout,
+      layoutProps: configLayoutProps,
       createSubComponentsDir: shouldCreateSubComponentsDir,
       createScriptsDir: shouldCreateScriptsDir,
       createApi: shouldCreateApi,
@@ -305,6 +307,32 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateScriptsDir) await ensureNotExists(scriptsIndexPath, options.force);
     
     let layoutImportPath = null;
+    const cliProps = options.prop || {};
+    const rawLayoutProps = { ...configLayoutProps, ...cliProps };
+    const layoutProps = {};
+    
+    // Resolve variables in layoutProps
+    const substitutionData = enrichData({
+        componentName: featureComponentName,
+        layoutName: layout,
+        featureComponentName: featureComponentName
+    });
+
+    for (const [key, value] of Object.entries(rawLayoutProps)) {
+        if (typeof value === 'string') {
+            let resolvedValue = value;
+            for (const [varKey, varValue] of Object.entries(substitutionData)) {
+                const regex = new RegExp(`{{${varKey}}}`, 'g');
+                resolvedValue = resolvedValue.replace(regex, varValue);
+                const underscoreRegex = new RegExp(`__${varKey}__`, 'g');
+                resolvedValue = resolvedValue.replace(underscoreRegex, varValue);
+            }
+            layoutProps[key] = resolvedValue;
+        } else {
+            layoutProps[key] = value;
+        }
+    }
+
     if (routeFilePath && layout !== 'none') {
       if (config.importAliases.layouts) {
         layoutImportPath = `${config.importAliases.layouts}/${layout}.astro`;
@@ -317,7 +345,7 @@ export async function addSectionCommand(route, featurePath, options) {
     let featureImportPath = null;
     if (routeFilePath) {
       if (config.importAliases.features) {
-        const entryPart = effectiveOptions.entry === 'index' ? '' : `/${featureComponentName}`;
+        const entryPart = effectiveOptions.entry === 'index' ? '/index' : `/${featureComponentName}`;
         // In Astro, we can often omit the extension for .tsx files, but not for .astro files if using aliases sometimes.
         // However, to be safe, we use the configured extension.
         featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}${config.naming.featureExtension}`;
@@ -350,7 +378,8 @@ export async function addSectionCommand(route, featurePath, options) {
           layoutImportPath,
           featureImportPath,
           featureComponentName,
-          routeExtension
+          routeExtension,
+          layoutProps
         );
         routeSignature = getSignature(config, 'astro');
       }

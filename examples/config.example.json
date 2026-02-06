@@ -11,6 +11,8 @@
     "indexFile": "index.astro"
   },
   "importAliases": {
+    "layouts": "@/layouts",
+    "features": "@/features"
   },
   "naming": {
     "routeExtension": ".astro",
@@ -41,7 +43,11 @@
     "createReadme": false,
     "createStories": false,
     "createIndex": false,
-    "layout": "Main"
+    "layout": "Main",
+    "layoutProps": {
+      "title": "{{componentName}}",
+      "description": "Page for {{componentName}}"
+    }
   },
   "components": {
     "framework": "react",

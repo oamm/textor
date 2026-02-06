@@ -37,6 +37,7 @@ export const CURRENT_CONFIG_VERSION = 2;
  * @property {boolean} features.createScriptsDir
  * @property {string} features.scriptsIndexFile
  * @property {string} features.layout
+ * @property {Object} features.layoutProps
  * @property {Object} components
  * @property {boolean} components.createSubComponentsDir
  * @property {boolean} components.createContext
@@ -103,7 +104,8 @@ export const DEFAULT_CONFIG = {
     createReadme: false,
     createStories: false,
     createIndex: false,
-    layout: 'Main'
+    layout: 'Main',
+    layoutProps: {}
   },
   components: {
     framework: 'react',

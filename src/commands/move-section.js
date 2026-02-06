@@ -10,11 +10,13 @@ import {
   getRelativeImportPath 
 } from '../utils/naming.js';
 import { 
+  calculateHash,
   safeMove,
   ensureDir,
   updateSignature,
   cleanupEmptyDirs,
-  secureJoin
+  secureJoin,
+  scanDirectory
 } from '../utils/filesystem.js';
 import { loadState, findSection, saveState } from '../utils/state.js';
 import { isRepoClean } from '../utils/git.js';
@@ -159,9 +161,14 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       const fromFeatureComponentName = getFeatureComponentName(normalizedFromFeature);
       const toFeatureComponentName = getFeatureComponentName(targetFeature);
 
-      // Update component name in JSX
+      // First, update all relative imports in the file because it moved
+      await updateImportsInFile(toRoutePath, fromRoutePath, toRoutePath);
+
+      let content = await readFile(toRoutePath, 'utf-8');
+      let changed = false;
+
+      // Update component name in JSX tags
       if (fromFeatureComponentName !== toFeatureComponentName) {
-        let content = await readFile(toRoutePath, 'utf-8');
         content = content.replace(
           new RegExp(`<${fromFeatureComponentName}`, 'g'),
           `<${toFeatureComponentName}`
@@ -170,43 +177,53 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
           new RegExp(`</${fromFeatureComponentName}`, 'g'),
           `</${toFeatureComponentName}`
         );
-        await writeFile(toRoutePath, content, 'utf-8');
+        changed = true;
       }
 
       if (config.importAliases.features) {
-        if (normalizedFromFeature !== targetFeature) {
-          const oldAliasPath = `${config.importAliases.features}/${normalizedFromFeature}`;
-          const newAliasPath = `${config.importAliases.features}/${targetFeature}`;
-          const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
-          
-          // Replace both the path and the component name if they are different
-          await updateSignature(toRoutePath, 
-            `import ${fromFeatureComponentName} from '${oldAliasPath}/${fromFeatureComponentName}${ext}'`, 
-            `import ${toFeatureComponentName} from '${newAliasPath}/${toFeatureComponentName}${ext}'`
-          );
-          
-          // Fallback for prefix only replacement
-          await updateSignature(toRoutePath, oldAliasPath, newAliasPath);
-        } else if (fromFeatureComponentName !== toFeatureComponentName) {
-          // Name changed but path didn't
-          const aliasPath = `${config.importAliases.features}/${targetFeature}`;
-          const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
-          await updateSignature(toRoutePath,
-            `import ${fromFeatureComponentName} from '${aliasPath}/${fromFeatureComponentName}${ext}'`,
-            `import ${toFeatureComponentName} from '${aliasPath}/${toFeatureComponentName}${ext}'`
-          );
+        const oldAliasPath = `${config.importAliases.features}/${normalizedFromFeature}`;
+        const newAliasPath = `${config.importAliases.features}/${targetFeature}`;
+        
+        // Flexible regex to match import identifier and path with alias
+        const importRegex = new RegExp(`(import\\s+)(${fromFeatureComponentName})(\\s+from\\s+['"])${oldAliasPath}(/[^'"]+)?(['"])`, 'g');
+        
+        if (importRegex.test(content)) {
+          content = content.replace(importRegex, (match, p1, p2, p3, subPath, p5) => {
+            let newSubPath = subPath || '';
+            if (subPath && subPath.includes(fromFeatureComponentName)) {
+              newSubPath = subPath.replace(fromFeatureComponentName, toFeatureComponentName);
+            }
+            return `${p1}${toFeatureComponentName}${p3}${newAliasPath}${newSubPath}${p5}`;
+          });
+          changed = true;
+        } else if (content.includes(oldAliasPath)) {
+          // Fallback for path only replacement
+          content = content.replace(new RegExp(oldAliasPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), newAliasPath);
+          changed = true;
         }
       } else {
-        const oldRelativeDir = getRelativeImportPath(fromRoutePath, fromFeatureDirPath);
+        const oldRelativeDir = getRelativeImportPath(toRoutePath, fromFeatureDirPath);
         const newRelativeDir = getRelativeImportPath(toRoutePath, toFeatureDirPath);
-        const ext = config.naming.featureExtension === '.astro' ? '.astro' : '';
         
-        const oldImportPath = `import ${fromFeatureComponentName} from '${oldRelativeDir}/${fromFeatureComponentName}${ext}'`;
-        const newImportPath = `import ${toFeatureComponentName} from '${newRelativeDir}/${toFeatureComponentName}${ext}'`;
+        // Flexible regex for relative imports
+        const relImportRegex = new RegExp(`(import\\s+)(${fromFeatureComponentName})(\\s+from\\s+['"])${oldRelativeDir}(/[^'"]+)?(['"])`, 'g');
         
-        if (oldImportPath !== newImportPath) {
-          await updateSignature(toRoutePath, oldImportPath, newImportPath);
+        if (relImportRegex.test(content)) {
+          content = content.replace(relImportRegex, (match, p1, p2, p3, subPath, p5) => {
+            let newSubPath = subPath || '';
+            if (subPath && subPath.includes(fromFeatureComponentName)) {
+              newSubPath = subPath.replace(fromFeatureComponentName, toFeatureComponentName);
+            }
+            return `${p1}${toFeatureComponentName}${p3}${newRelativeDir}${newSubPath}${p5}`;
+          });
+          changed = true;
         }
+      }
+
+      if (changed) {
+        await writeFile(toRoutePath, content, 'utf-8');
+        // Update hash in state after changes
+        state.files[normalizedToRouteRelative].hash = calculateHash(content, config.hashing?.normalization);
       }
     }
     
@@ -278,7 +295,6 @@ async function scanAndReplaceImports(config, state, fromInfo, toInfo, options) {
   const { toFeaturePath, toComponentName } = toInfo;
   
   const allFiles = new Set();
-  const { scanDirectory, calculateHash } = await import('../utils/filesystem.js');
   await scanDirectory(process.cwd(), allFiles);
   
   const featuresRoot = resolvePath(config, 'features');
@@ -419,7 +435,6 @@ async function moveDirectory(fromPath, toPath, state, config, options = {}) {
         if (hasChanged) {
            await writeFile(toEntryPath, content, 'utf-8');
            // Re-calculate hash after content update
-           const { calculateHash } = await import('../utils/filesystem.js');
            const updatedHash = calculateHash(content, config.hashing?.normalization);
            
            const normalizedToRelative = path.relative(process.cwd(), toEntryPath).replace(/\\/g, '/');
@@ -450,4 +465,37 @@ async function moveDirectory(fromPath, toPath, state, config, options = {}) {
   if (remainingFiles.length === 0) {
     await rmdir(fromPath);
   }
+}
+
+async function updateImportsInFile(filePath, oldFilePath, newFilePath) {
+  if (!existsSync(filePath)) return;
+  
+  let content = await readFile(filePath, 'utf-8');
+  const oldDir = path.dirname(oldFilePath);
+  const newDir = path.dirname(newFilePath);
+  
+  if (oldDir === newDir) return;
+  
+  // Find all relative imports
+  const relativeImportRegex = /from\s+['"](\.\.?\/[^'"]+)['"]/g;
+  let match;
+  const replacements = [];
+  
+  while ((match = relativeImportRegex.exec(content)) !== null) {
+    const relativePath = match[1];
+    const absoluteTarget = path.resolve(oldDir, relativePath);
+    const newRelativePath = getRelativeImportPath(newFilePath, absoluteTarget);
+    
+    replacements.push({
+      full: match[0],
+      oldRel: relativePath,
+      newRel: newRelativePath
+    });
+  }
+  
+  for (const repl of replacements) {
+    content = content.replace(repl.full, `from '${repl.newRel}'`);
+  }
+  
+  await writeFile(filePath, content, 'utf-8');
 }

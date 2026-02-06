@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { toPascalCase, toCamelCase, toKebabCase, toSnakeCase, toScreamingSnakeCase } from './naming.js';
 
-function enrichData(data) {
+export function enrichData(data) {
   const enriched = { ...data };
   const nameKeys = ['componentName', 'featureComponentName', 'layoutName'];
   for (const key of nameKeys) {
@@ -38,13 +38,15 @@ function getTemplateOverride(templateName, extension, data = {}) {
  * - layoutImportPath: Path to import the layout
  * - featureImportPath: Path to import the feature component
  * - featureComponentName: Name of the feature component
+ * - layoutProps: Optional properties for the layout
  */
-export function generateRouteTemplate(layoutName, layoutImportPath, featureImportPath, featureComponentName, extension = '.astro') {
+export function generateRouteTemplate(layoutName, layoutImportPath, featureImportPath, featureComponentName, extension = '.astro', layoutProps = {}) {
   const override = getTemplateOverride('route', extension, {
     layoutName,
     layoutImportPath,
     featureImportPath,
-    featureComponentName
+    featureComponentName,
+    ...layoutProps
   });
   if (override) return override;
 
@@ -57,12 +59,26 @@ import ${featureComponentName} from '${featureImportPath}';
 `;
   }
 
+  const propsStr = Object.entries(layoutProps)
+    .map(([key, value]) => {
+      if (typeof value === 'string' && value.startsWith('{') && value.endsWith('}')) {
+        return `${key}=${value}`;
+      }
+      if (typeof value === 'string') {
+        return `${key}="${value}"`;
+      }
+      return `${key}={${JSON.stringify(value)}}`;
+    })
+    .join(' ');
+
+  const layoutOpening = propsStr ? `<${layoutName} ${propsStr}>` : `<${layoutName}>`;
+
   return `---
 import ${layoutName} from '${layoutImportPath}';
 import ${featureComponentName} from '${featureImportPath}';
 ---
 
-<${layoutName}>
+${layoutOpening}
   <${featureComponentName} />
 </${layoutName}>
 `;
@@ -272,6 +288,11 @@ export function generateConstantsTemplate(componentName) {
 export function generateIndexTemplate(componentName, componentExtension) {
   const override = getTemplateOverride('index', '.ts', { componentName, componentExtension });
   if (override) return override;
+
+  if (componentExtension === '.astro') {
+    return `export * from './types';
+`;
+  }
 
   return `export { default as ${componentName} } from './${componentName}${componentExtension}';
 export * from './types';
