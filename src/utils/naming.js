@@ -39,6 +39,7 @@ export function normalizeComponentName(name) {
 }
 
 export function normalizeRoute(route) {
+  if (!route) return null;
   let normalized = route.trim();
   
   if (!normalized.startsWith('/')) {

@@ -114,10 +114,21 @@ If you have manually edited a Textor-generated file and wish to remove or move i
 ## 🛠️ Commands
 
 ### add-section
-Create a route + feature binding.
+Create a route + feature binding, or a standalone feature.
 
 ```bash
-pnpm textor add-section <route> <featurePath> [options]
+pnpm textor add-section [route] <featurePath> [options]
+```
+
+If `route` is provided, Textor creates both a route adapter (e.g., in `src/pages`) and a feature module. If `route` is omitted, Textor scaffolds only the feature module. This is useful for features that are shared across multiple pages or used as sub-parts of other features.
+
+**Examples:**
+```bash
+# Create a section with a route
+pnpm textor add-section /users users/catalog
+
+# Create a standalone feature (no route file)
+pnpm textor add-section auth/login
 ```
 
 **Options:**
@@ -148,6 +159,14 @@ pnpm textor move-section /old /new
 
 ### remove-section / remove-component
 Safely remove Textor-managed modules.
+
+```bash
+# Remove by route
+pnpm textor remove-section /users
+
+# Remove a standalone feature by its name or path
+pnpm textor remove-section auth/login
+```
 
 ### list-sections
 List all Textor-managed modules, including their architectural capabilities (API, Hooks, etc.).

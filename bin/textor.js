@@ -27,8 +27,8 @@ program
   .action(initCommand);
 
 program
-  .command('add-section <route> <featurePath>')
-  .description('Create a route + feature binding')
+  .command('add-section [route] [featurePath]')
+  .description('Create a route + feature binding (route optional for standalone features)')
   .option('--preset <name>', 'Scaffolding preset (minimal, standard, senior)')
   .option('--layout <name>', 'Layout component name (use "none" for no layout)', 'Main')
   .option('--name <name>', 'Section name for state tracking')

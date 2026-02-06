@@ -42,6 +42,14 @@ import { stageFiles } from '../utils/git.js';
 export async function addSectionCommand(route, featurePath, options) {
   try {
     const config = await loadConfig();
+
+    // Handle optional route
+    if (typeof featurePath === 'object' || featurePath === undefined) {
+      options = featurePath || options || {};
+      featurePath = route;
+      route = null;
+    }
+    
     const effectiveOptions = getEffectiveOptions(options, config, 'features');
     
     const normalizedRoute = normalizeRoute(route);
@@ -56,7 +64,7 @@ export async function addSectionCommand(route, featurePath, options) {
     // Check if we should use nested mode even if config says flat
     // (because the directory already exists, suggesting it should be an index file)
     let effectiveRoutingMode = config.routing.mode;
-    if (effectiveRoutingMode === 'flat') {
+    if (normalizedRoute && effectiveRoutingMode === 'flat') {
       const routeDirName = routeToFilePath(normalizedRoute, {
         extension: '',
         mode: 'flat'
@@ -67,11 +75,11 @@ export async function addSectionCommand(route, featurePath, options) {
       }
     }
 
-    const routeFileName = routeToFilePath(normalizedRoute, {
+    const routeFileName = normalizedRoute ? routeToFilePath(normalizedRoute, {
       extension: routeExtension,
       mode: effectiveRoutingMode,
       indexFile: config.routing.indexFile
-    });
+    }) : null;
     
     const featureComponentName = getFeatureComponentName(normalizedFeaturePath);
     const featureFileName = getFeatureFileName(normalizedFeaturePath, {
@@ -79,7 +87,7 @@ export async function addSectionCommand(route, featurePath, options) {
       strategy: effectiveOptions.entry
     });
     
-    const routeFilePath = secureJoin(pagesRoot, routeFileName);
+    const routeFilePath = routeFileName ? secureJoin(pagesRoot, routeFileName) : null;
     const featureDirPath = secureJoin(featuresRoot, normalizedFeaturePath);
     const featureFilePath = secureJoin(featureDirPath, featureFileName);
     const scriptsIndexPath = secureJoin(featureDirPath, config.features.scriptsIndexFile);
@@ -119,10 +127,10 @@ export async function addSectionCommand(route, featurePath, options) {
     const readmeFilePath = path.join(featureDirPath, 'README.md');
     const storiesFilePath = path.join(featureDirPath, `${featureComponentName}.stories.tsx`);
 
-    const routeParts = normalizedRoute.split('/').filter(Boolean);
+    const routeParts = normalizedRoute ? normalizedRoute.split('/').filter(Boolean) : [];
     const reorganizations = [];
 
-    if (routeParts.length > 1 && config.routing.mode === 'flat') {
+    if (normalizedRoute && routeParts.length > 1 && config.routing.mode === 'flat') {
       const possibleExtensions = ['.astro', '.ts', '.js', '.md', '.mdx', '.html'];
       for (let i = 1; i < routeParts.length; i++) {
         const parentRoute = '/' + routeParts.slice(0, i).join('/');
@@ -157,7 +165,7 @@ export async function addSectionCommand(route, featurePath, options) {
 
     if (options.dryRun) {
       console.log('Dry run - would create:');
-      console.log(`  Route: ${routeFilePath}`);
+      if (routeFilePath) console.log(`  Route: ${routeFilePath}`);
       console.log(`  Feature: ${featureFilePath}`);
 
       for (const reorg of reorganizations) {
@@ -202,7 +210,7 @@ export async function addSectionCommand(route, featurePath, options) {
       await saveState(state);
     }
 
-    await ensureNotExists(routeFilePath, options.force);
+    if (routeFilePath) await ensureNotExists(routeFilePath, options.force);
     await ensureNotExists(featureFilePath, options.force);
     
     if (shouldCreateIndex) await ensureNotExists(indexFilePath, options.force);
@@ -218,7 +226,7 @@ export async function addSectionCommand(route, featurePath, options) {
     if (shouldCreateScriptsDir) await ensureNotExists(scriptsIndexPath, options.force);
     
     let layoutImportPath = null;
-    if (options.layout !== 'none') {
+    if (routeFilePath && options.layout !== 'none') {
       if (config.importAliases.layouts) {
         layoutImportPath = `${config.importAliases.layouts}/${options.layout}.astro`;
       } else {
@@ -227,19 +235,21 @@ export async function addSectionCommand(route, featurePath, options) {
       }
     }
 
-    let featureImportPath;
-    if (config.importAliases.features) {
-      const entryPart = effectiveOptions.entry === 'index' ? '' : `/${featureComponentName}`;
-      // In Astro, we can often omit the extension for .tsx files, but not for .astro files if using aliases sometimes.
-      // However, to be safe, we use the configured extension.
-      featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}${config.naming.featureExtension}`;
-    } else {
-      const relativeFeatureFile = getRelativeImportPath(routeFilePath, featureFilePath);
-      // Remove extension for import if it's not an .astro file
-      if (config.naming.featureExtension === '.astro') {
-        featureImportPath = relativeFeatureFile;
+    let featureImportPath = null;
+    if (routeFilePath) {
+      if (config.importAliases.features) {
+        const entryPart = effectiveOptions.entry === 'index' ? '' : `/${featureComponentName}`;
+        // In Astro, we can often omit the extension for .tsx files, but not for .astro files if using aliases sometimes.
+        // However, to be safe, we use the configured extension.
+        featureImportPath = `${config.importAliases.features}/${normalizedFeaturePath}${entryPart}${config.naming.featureExtension}`;
       } else {
-        featureImportPath = relativeFeatureFile.replace(/\.[^/.]+$/, '');
+        const relativeFeatureFile = getRelativeImportPath(routeFilePath, featureFilePath);
+        // Remove extension for import if it's not an .astro file
+        if (config.naming.featureExtension === '.astro') {
+          featureImportPath = relativeFeatureFile;
+        } else {
+          featureImportPath = relativeFeatureFile.replace(/\.[^/.]+$/, '');
+        }
       }
     }
     
@@ -251,35 +261,40 @@ export async function addSectionCommand(route, featurePath, options) {
     let routeContent;
     let routeSignature;
     
-    if (options.endpoint) {
-      routeContent = generateEndpointTemplate(featureComponentName);
-      routeSignature = getSignature(config, 'typescript');
-    } else {
-      routeContent = generateRouteTemplate(
-        options.layout,
-        layoutImportPath,
-        featureImportPath,
-        featureComponentName
-      );
-      routeSignature = getSignature(config, 'astro');
+    if (routeFilePath) {
+      if (options.endpoint) {
+        routeContent = generateEndpointTemplate(featureComponentName);
+        routeSignature = getSignature(config, 'typescript');
+      } else {
+        routeContent = generateRouteTemplate(
+          options.layout,
+          layoutImportPath,
+          featureImportPath,
+          featureComponentName
+        );
+        routeSignature = getSignature(config, 'astro');
+      }
     }
     
     const featureContent = generateFeatureTemplate(featureComponentName, scriptImportPath, framework);
     
-    const routeHash = await writeFileWithSignature(
-      routeFilePath,
-      routeContent,
-      routeSignature,
-      config.hashing?.normalization
-    );
-    await registerFile(routeFilePath, { 
-      kind: 'route', 
-      template: options.endpoint ? 'endpoint' : 'route', 
-      hash: routeHash,
-      owner: normalizedRoute 
-    });
-    
-    const writtenFiles = [routeFilePath];
+    const writtenFiles = [];
+
+    if (routeFilePath) {
+      const routeHash = await writeFileWithSignature(
+        routeFilePath,
+        routeContent,
+        routeSignature,
+        config.hashing?.normalization
+      );
+      await registerFile(routeFilePath, { 
+        kind: 'route', 
+        template: options.endpoint ? 'endpoint' : 'route', 
+        hash: routeHash,
+        owner: normalizedRoute 
+      });
+      writtenFiles.push(routeFilePath);
+    }
 
     await ensureDir(featureDirPath);
     
@@ -503,7 +518,7 @@ export async function addSectionCommand(route, featurePath, options) {
     }
 
     console.log('✓ Section created successfully:');
-    console.log(`  Route: ${routeFilePath}`);
+    if (routeFilePath) console.log(`  Route: ${routeFilePath}`);
     console.log(`  Feature: ${featureFilePath}`);
     
     if (shouldCreateIndex) console.log(`  Index: ${indexFilePath}`);

@@ -81,8 +81,12 @@ export async function getFileData(filePath) {
 
 export async function addSectionToState(section) {
   const state = await loadState();
-  // Avoid duplicates by route
-  state.sections = state.sections.filter(s => s.route !== section.route);
+  // Avoid duplicates by route OR by featurePath if route is null
+  if (section.route) {
+    state.sections = state.sections.filter(s => s.route !== section.route);
+  } else {
+    state.sections = state.sections.filter(s => s.featurePath !== section.featurePath || s.route);
+  }
   state.sections.push(section);
   await saveState(state);
 }
