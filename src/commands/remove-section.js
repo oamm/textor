@@ -1,11 +1,15 @@
 import path from 'path';
+import { rename, readFile, writeFile, readdir } from 'fs/promises';
+import { existsSync } from 'fs';
 import { loadConfig, resolvePath } from '../utils/config.js';
 import { 
   normalizeRoute, 
   routeToFilePath, 
-  featureToDirectoryPath
+  featureToDirectoryPath,
+  getRelativeImportPath
 } from '../utils/naming.js';
 import { 
+  calculateHash,
   safeDelete, 
   safeDeleteDir,
   cleanupEmptyDirs,
@@ -24,33 +28,43 @@ export async function removeSectionCommand(route, featurePath, options) {
 
     const state = await loadState();
     
-    let targetRoute = route;
-    let targetFeaturePath = featurePath;
     let section = findSection(state, route);
+    if (!section && featurePath) {
+      section = findSection(state, featurePath);
+    }
+
+    const targetRoute = section ? section.route : route;
+    const targetFeaturePath = section ? section.featurePath : featurePath;
 
     if (!targetFeaturePath) {
-      if (section) {
-        targetRoute = section.route;
-        targetFeaturePath = section.featurePath;
-      } else {
-        throw new Error(`Section not found for identifier: ${route}. Please provide both route and featurePath.`);
-      }
+      throw new Error(`Section not found for identifier: ${route}. Please provide both route and featurePath.`);
     }
     
     const normalizedRoute = normalizeRoute(targetRoute);
     const normalizedFeaturePath = featureToDirectoryPath(targetFeaturePath);
     
-    const routeExtension = (section && section.extension) || config.naming.routeExtension;
-    const routeFileName = routeToFilePath(normalizedRoute, {
-      extension: routeExtension,
-      mode: config.routing.mode,
-      indexFile: config.routing.indexFile
-    });
-    
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
+
+    // Find route file in state if possible
+    let routeFilePath = null;
+    const routeRelPath = Object.keys(state.files).find(f => {
+      const data = state.files[f];
+      return data.kind === 'route' && data.owner === normalizedRoute;
+    });
+
+    if (routeRelPath) {
+      routeFilePath = path.resolve(process.cwd(), routeRelPath);
+    } else {
+      const routeExtension = (section && section.extension) || config.naming.routeExtension;
+      const routeFileName = routeToFilePath(normalizedRoute, {
+        extension: routeExtension,
+        mode: config.routing.mode,
+        indexFile: config.routing.indexFile
+      });
+      routeFilePath = secureJoin(pagesRoot, routeFileName);
+    }
     
-    const routeFilePath = secureJoin(pagesRoot, routeFileName);
     const featureDirPath = secureJoin(featuresRoot, normalizedFeaturePath);
     
     const deletedFiles = [];
@@ -137,8 +151,67 @@ export async function removeSectionCommand(route, featurePath, options) {
     }
     
     if (deletedFiles.length === 0 && deletedDirs.length === 0 && skippedFiles.length === 0) {
-      console.log('No files to delete.');
+      if (section) {
+        console.log(`✓ Section ${normalizedRoute} removed from state (files were already missing on disk).`);
+        state.sections = state.sections.filter(s => s.route !== normalizedRoute);
+        await saveState(state);
+      } else {
+        console.log('No files to delete.');
+      }
     } else {
+      // Reorganization (Flattening)
+      if (!options.keepRoute && deletedFiles.length > 0 && config.routing.mode === 'flat') {
+        const routeParts = normalizedRoute.split('/').filter(Boolean);
+        if (routeParts.length > 1) {
+          for (let i = routeParts.length - 1; i >= 1; i--) {
+            const parentRoute = '/' + routeParts.slice(0, i).join('/');
+            const parentDirName = routeParts.slice(0, i).join('/');
+            const parentDirPath = secureJoin(pagesRoot, parentDirName);
+            
+            if (existsSync(parentDirPath)) {
+              const filesInDir = await readdir(parentDirPath);
+              
+              if (filesInDir.length === 1) {
+                const loneFile = filesInDir[0];
+                const ext = path.extname(loneFile);
+                const indexFile = ext === '.astro' ? config.routing.indexFile : `index${ext}`;
+                
+                if (loneFile === indexFile) {
+                  const loneFilePath = path.join(parentDirPath, loneFile);
+                  const oldRelative = path.relative(process.cwd(), loneFilePath).replace(/\\/g, '/');
+
+                  if (state.files[oldRelative] && state.files[oldRelative].kind === 'route') {
+                    const flatFileName = routeToFilePath(parentRoute, {
+                      extension: ext,
+                      mode: 'flat'
+                    });
+                    const flatFilePath = secureJoin(pagesRoot, flatFileName);
+                      
+                    if (!existsSync(flatFilePath)) {
+                      await rename(loneFilePath, flatFilePath);
+                        
+                      const newRelative = path.relative(process.cwd(), flatFilePath).replace(/\\/g, '/');
+                        
+                      state.files[newRelative] = { ...state.files[oldRelative] };
+                      delete state.files[oldRelative];
+                        
+                      await updateImportsInFile(flatFilePath, loneFilePath, flatFilePath);
+
+                      // Update hash in state after import updates
+                      const content = await readFile(flatFilePath, 'utf-8');
+                      state.files[newRelative].hash = calculateHash(content, config.hashing?.normalization);
+
+                      console.log(`✓ Reorganized ${oldRelative} to ${newRelative} (flattened)`);
+                      await cleanupEmptyDirs(parentDirPath, pagesRoot);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       state.sections = state.sections.filter(s => s.route !== normalizedRoute);
       await saveState(state);
     }
@@ -150,4 +223,37 @@ export async function removeSectionCommand(route, featurePath, options) {
     }
     throw error;
   }
+}
+
+async function updateImportsInFile(filePath, oldFilePath, newFilePath) {
+  if (!existsSync(filePath)) return;
+  
+  let content = await readFile(filePath, 'utf-8');
+  const oldDir = path.dirname(oldFilePath);
+  const newDir = path.dirname(newFilePath);
+  
+  if (oldDir === newDir) return;
+  
+  // Find all relative imports
+  const relativeImportRegex = /from\s+['"](\.\.?\/[^'"]+)['"]/g;
+  let match;
+  const replacements = [];
+  
+  while ((match = relativeImportRegex.exec(content)) !== null) {
+    const relativePath = match[1];
+    const absoluteTarget = path.resolve(oldDir, relativePath);
+    const newRelativePath = getRelativeImportPath(newFilePath, absoluteTarget);
+    
+    replacements.push({
+      full: match[0],
+      oldRel: relativePath,
+      newRel: newRelativePath
+    });
+  }
+  
+  for (const repl of replacements) {
+    content = content.replace(repl.full, `from '${repl.newRel}'`);
+  }
+  
+  await writeFile(filePath, content, 'utf-8');
 }

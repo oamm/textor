@@ -43,9 +43,13 @@ export async function removeComponentCommand(identifier, options) {
       owner: identifier
     });
     
-    if (result.deleted) {
-      console.log(`✓ Deleted component: ${componentDir}/`);
-      await cleanupEmptyDirs(path.dirname(componentDir), path.join(process.cwd(), config.paths.components));
+    if (result.deleted || (result.reason === 'not-found' && component)) {
+      if (result.deleted) {
+        console.log(`✓ Deleted component: ${componentDir}/`);
+        await cleanupEmptyDirs(path.dirname(componentDir), path.join(process.cwd(), config.paths.components));
+      } else {
+        console.log(`✓ Component ${identifier} removed from state (directory was already missing on disk).`);
+      }
       
       // Unregister files
       const relComponentPath = path.relative(process.cwd(), componentDir).replace(/\\/g, '/');

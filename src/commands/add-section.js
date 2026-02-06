@@ -13,6 +13,7 @@ import {
   getHookFunctionName
 } from '../utils/naming.js';
 import { 
+  calculateHash,
   ensureNotExists, 
   writeFileWithSignature,
   getSignature,
@@ -275,6 +276,12 @@ export async function addSectionCommand(route, featurePath, options) {
 
         // Update imports in the moved file
         await updateImportsInFile(reorg.to, reorg.from, reorg.to);
+        
+        // Update hash in state after import updates
+        if (state.files[newRelative]) {
+          const content = await readFile(reorg.to, 'utf-8');
+          state.files[newRelative].hash = calculateHash(content, config.hashing?.normalization);
+        }
         
         console.log(`✓ Reorganized ${oldRelative} to ${newRelative}`);
       }
