@@ -45,6 +45,7 @@ export async function removeSectionCommand(route, featurePath, options) {
     
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
+    const configSignatures = Object.values(config.signatures || {});
 
     // Find route file in state if possible
     let routeFilePath = null;
@@ -94,7 +95,8 @@ export async function removeSectionCommand(route, featurePath, options) {
         acceptChanges: options.acceptChanges,
         normalization: config.hashing?.normalization,
         owner: normalizedRoute,
-        actualOwner: fileState?.owner
+        actualOwner: fileState?.owner,
+        signatures: configSignatures
       });
       
       if (result.deleted) {
@@ -111,7 +113,8 @@ export async function removeSectionCommand(route, featurePath, options) {
         stateFiles: state.files,
         acceptChanges: options.acceptChanges,
         normalization: config.hashing?.normalization,
-        owner: normalizedRoute
+        owner: normalizedRoute,
+        signatures: configSignatures
       });
       
       if (result.deleted) {

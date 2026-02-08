@@ -295,7 +295,8 @@ export async function addSectionCommand(route, featurePath, options) {
 
     if (routeFilePath) {
       if (existsSync(routeFilePath)) {
-        const isGenerated = await isTextorGenerated(routeFilePath);
+        const configSignatures = Object.values(config.signatures || {});
+        const isGenerated = await isTextorGenerated(routeFilePath, configSignatures);
         if (!isGenerated && !options.force) {
           throw new Error(`File already exists: ${routeFilePath}\nUse --force to overwrite.`);
         }

@@ -64,7 +64,8 @@ export async function verifyFileIntegrity(filePath, expectedHash, options = {}) 
     acceptChanges = false, 
     normalization = 'normalizeEOL',
     owner = null,
-    actualOwner = null
+    actualOwner = null,
+    signatures = []
   } = options;
   
   if (force) return { valid: true };
@@ -77,7 +78,7 @@ export async function verifyFileIntegrity(filePath, expectedHash, options = {}) 
     };
   }
 
-  const isGenerated = await isTextorGenerated(filePath);
+  const isGenerated = await isTextorGenerated(filePath, signatures);
   if (!isGenerated) {
     return { 
       valid: false, 
@@ -110,7 +111,7 @@ export async function verifyFileIntegrity(filePath, expectedHash, options = {}) 
 }
 
 export async function safeDelete(filePath, options = {}) {
-  const { force = false, expectedHash = null, acceptChanges = false, owner = null, actualOwner = null } = options;
+  const { force = false, expectedHash = null, acceptChanges = false, owner = null, actualOwner = null, signatures = [] } = options;
   
   if (!existsSync(filePath)) {
     return { deleted: false, reason: 'not-found' };
@@ -120,7 +121,8 @@ export async function safeDelete(filePath, options = {}) {
     force, 
     acceptChanges,
     owner,
-    actualOwner
+    actualOwner,
+    signatures
   });
   if (!integrity.valid) {
     return { deleted: false, reason: integrity.reason, message: integrity.message };
@@ -162,7 +164,8 @@ async function isSafeToDeleteDir(dirPath, stateFiles = {}, options = {}) {
         const fileState = stateFiles[normalizedPath];
         const integrity = await verifyFileIntegrity(filePath, fileState?.hash, {
           ...options,
-          actualOwner: fileState?.owner
+          actualOwner: fileState?.owner,
+          signatures: options.signatures || []
         });
         return integrity.valid;
       })
@@ -258,7 +261,8 @@ export async function safeMove(fromPath, toPath, options = {}) {
     acceptChanges, 
     normalization,
     owner,
-    actualOwner
+    actualOwner,
+    signatures: options.signatures || []
   });
   if (!integrity.valid) {
     throw new Error(integrity.message);

@@ -54,11 +54,12 @@ export async function validateStateCommand(options) {
     
     if (options.fix) {
       let fixedCount = 0;
+      const signatures = Object.values(config.signatures || {});
       
       // Fix modified files if they still have the Textor signature
       for (const mod of results.modified) {
         const fullPath = path.join(process.cwd(), mod.path);
-        if (await isTextorGenerated(fullPath)) {
+        if (await isTextorGenerated(fullPath, signatures)) {
           state.files[mod.path].hash = mod.newHash;
           fixedCount++;
         }

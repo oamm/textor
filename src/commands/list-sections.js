@@ -17,7 +17,8 @@ export async function listSectionsCommand() {
       console.log('  No pages directory found.');
     } else {
       const extensions = [config.naming.routeExtension, '.ts', '.js'];
-      const sections = await findGeneratedFiles(pagesRoot, extensions);
+      const signatures = Object.values(config.signatures || {});
+      const sections = await findGeneratedFiles(pagesRoot, extensions, signatures);
       
       if (sections.length === 0) {
         console.log('  No Textor-managed sections found.');
@@ -121,7 +122,7 @@ export async function listSectionsCommand() {
   }
 }
 
-async function findGeneratedFiles(dir, extensions) {
+async function findGeneratedFiles(dir, extensions, signatures) {
   const results = [];
   const entries = await readdir(dir);
   const exts = Array.isArray(extensions) ? extensions : [extensions];
@@ -131,9 +132,9 @@ async function findGeneratedFiles(dir, extensions) {
     const stats = await stat(fullPath);
 
     if (stats.isDirectory()) {
-      results.push(...await findGeneratedFiles(fullPath, exts));
+      results.push(...await findGeneratedFiles(fullPath, exts, signatures));
     } else if (exts.some(ext => entry.endsWith(ext))) {
-      if (await isTextorGenerated(fullPath)) {
+      if (await isTextorGenerated(fullPath, signatures)) {
         results.push(fullPath);
       }
     }

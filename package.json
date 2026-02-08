@@ -1,6 +1,6 @@
 {
   "name": "@oamm/textor",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Safe, deterministic scaffolding and refactoring tool for Astro projects",
   "type": "module",
   "bin": {

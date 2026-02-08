@@ -11,6 +11,7 @@ import path from 'path';
 export async function removeComponentCommand(identifier, options) {
   try {
     const config = await loadConfig();
+    const configSignatures = Object.values(config.signatures || {});
 
     if (config.git?.requireCleanRepo && !await isRepoClean()) {
       throw new Error('Git repository is not clean. Please commit or stash your changes before proceeding.');
@@ -40,7 +41,8 @@ export async function removeComponentCommand(identifier, options) {
       stateFiles: state.files,
       acceptChanges: options.acceptChanges,
       normalization: config.hashing?.normalization,
-      owner: identifier
+      owner: identifier,
+      signatures: configSignatures
     });
     
     if (result.deleted || (result.reason === 'not-found' && component)) {

@@ -101,6 +101,7 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
     
     const pagesRoot = resolvePath(config, 'pages');
     const featuresRoot = resolvePath(config, 'features');
+    const configSignatures = Object.values(config.signatures || {});
     
     const fromSection = findSection(state, actualFromRoute);
     const routeExtension = (fromSection && fromSection.extension) || config.naming.routeExtension;
@@ -142,7 +143,8 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
       expectedHash: routeFileState?.hash,
       acceptChanges: options.acceptChanges,
       owner: normalizedFromRoute,
-      actualOwner: routeFileState?.owner
+      actualOwner: routeFileState?.owner,
+      signatures: configSignatures
     });
     movedFiles.push({ from: fromRoutePath, to: toRoutePath });
     
@@ -239,7 +241,8 @@ export async function moveSectionCommand(fromRoute, fromFeature, toRoute, toFeat
           ...options,
           fromName: fromFeatureComponentName,
           toName: toFeatureComponentName,
-          owner: normalizedFromRoute
+          owner: normalizedFromRoute,
+          signatures: configSignatures
         });
         movedFiles.push({ from: fromFeaturePath, to: toFeaturePath });
         
