@@ -72,6 +72,7 @@ export function normalizeRoute(route) {
 
 export function routeToFilePath(route, options = {}) {
   const { extension = '.astro', mode = 'flat', indexFile = 'index.astro' } = options;
+  if (!route) return null;
   const normalized = normalizeRoute(route);
   
   if (normalized === '/') {

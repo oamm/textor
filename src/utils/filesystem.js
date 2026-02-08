@@ -249,6 +249,11 @@ export async function safeMove(fromPath, toPath, options = {}) {
     throw new Error(`Source file not found: ${fromPath}`);
   }
 
+  if (path.resolve(fromPath) === path.resolve(toPath)) {
+    const content = await readFile(toPath, 'utf-8');
+    return calculateHash(content, normalization);
+  }
+
   if (existsSync(toPath) && !force) {
     throw new Error(
       `Destination already exists: ${toPath}\n` +

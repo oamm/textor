@@ -193,6 +193,22 @@ Move and rename sections safely. Textor performs **deep renaming**: if the featu
 pnpm textor move-section /old /new
 ```
 
+### rename
+Rename a route, feature, or component. Ideal for correcting typos. Supports **deep renaming** and optional repo-wide import updates.
+
+```bash
+# Rename a route (URL)
+pnpm textor rename route /lgoin /login
+
+# Rename a feature module (includes internal files and component names)
+pnpm textor rename feature auth/lgoin auth/login
+
+# Rename a shared component
+pnpm textor rename component Header SiteHeader
+```
+
+Use `--scan` to update imports across the entire project.
+
 ### remove-section / remove-component
 Safely remove Textor-managed modules.
 

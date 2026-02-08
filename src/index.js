@@ -11,3 +11,5 @@ export * from './commands/sync.js';
 export * from './commands/adopt.js';
 export * from './commands/upgrade-config.js';
 export * from './commands/normalize-state.js';
+export * from './commands/prune-missing.js';
+export * from './commands/rename.js';
