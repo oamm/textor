@@ -1,4 +1,5 @@
 import path from 'path';
+import { existsSync } from 'fs';
 import { loadConfig, resolvePath, getEffectiveOptions } from '../utils/config.js';
 import { 
   normalizeComponentName,
@@ -186,20 +187,26 @@ export async function createComponentCommand(componentName, options) {
       return;
     }
     
-    await ensureNotExists(componentFilePath, options.force);
-    await ensureNotExists(indexFilePath, options.force);
-    
-    if (shouldCreateContext) await ensureNotExists(contextFilePath, options.force);
-    if (shouldCreateHook) await ensureNotExists(hookFilePath, options.force);
-    if (shouldCreateTests) await ensureNotExists(testFilePath, options.force);
-    if (shouldCreateConfig) await ensureNotExists(configFilePath, options.force);
-    if (shouldCreateConstants) await ensureNotExists(constantsFilePath, options.force);
-    if (shouldCreateTypes) await ensureNotExists(typesFilePath, options.force);
-    if (shouldCreateApi) await ensureNotExists(apiFilePath, options.force);
-    if (shouldCreateServices) await ensureNotExists(servicesFilePath, options.force);
-    if (shouldCreateSchemas) await ensureNotExists(schemasFilePath, options.force);
-    if (shouldCreateReadme) await ensureNotExists(readmeFilePath, options.force);
-    if (shouldCreateStories) await ensureNotExists(storiesFilePath, options.force);
+    const componentExists = existsSync(componentFilePath);
+    if (componentExists && !options.force) {
+        console.log(`ℹ Component already exists at ${componentFilePath}. Entering additive mode.`);
+    }
+
+    // Check sub-items only if not in force mode
+    if (!options.force) {
+        if (existsSync(indexFilePath)) console.log(`  - Skipping existing index: ${indexFilePath}`);
+        if (shouldCreateContext && existsSync(contextFilePath)) console.log(`  - Skipping existing context: ${contextFilePath}`);
+        if (shouldCreateHook && existsSync(hookFilePath)) console.log(`  - Skipping existing hook: ${hookFilePath}`);
+        if (shouldCreateTests && existsSync(testFilePath)) console.log(`  - Skipping existing test: ${testFilePath}`);
+        if (shouldCreateConfig && existsSync(configFilePath)) console.log(`  - Skipping existing config: ${configFilePath}`);
+        if (shouldCreateConstants && existsSync(constantsFilePath)) console.log(`  - Skipping existing constants: ${constantsFilePath}`);
+        if (shouldCreateTypes && existsSync(typesFilePath)) console.log(`  - Skipping existing types: ${typesFilePath}`);
+        if (shouldCreateApi && existsSync(apiFilePath)) console.log(`  - Skipping existing api: ${apiFilePath}`);
+        if (shouldCreateServices && existsSync(servicesFilePath)) console.log(`  - Skipping existing services: ${servicesFilePath}`);
+        if (shouldCreateSchemas && existsSync(schemasFilePath)) console.log(`  - Skipping existing schemas: ${schemasFilePath}`);
+        if (shouldCreateReadme && existsSync(readmeFilePath)) console.log(`  - Skipping existing readme: ${readmeFilePath}`);
+        if (shouldCreateStories && existsSync(storiesFilePath)) console.log(`  - Skipping existing stories: ${storiesFilePath}`);
+    }
     
     await ensureDir(componentDir);
     
@@ -217,37 +224,42 @@ export async function createComponentCommand(componentName, options) {
     const componentContent = generateComponentTemplate(normalizedName, framework, config.naming.componentExtension);
     const signature = getSignature(config, config.naming.componentExtension === '.astro' ? 'astro' : 'tsx');
 
-    const componentHash = await writeFileWithSignature(
-      componentFilePath,
-      componentContent,
-      signature,
-      config.hashing?.normalization
-    );
-    await registerFile(componentFilePath, { 
-      kind: 'component', 
-      template: 'component', 
-      hash: componentHash,
-      owner: normalizedName 
-    });
-    
-    const writtenFiles = [componentFilePath];
+    const writtenFiles = [];
 
-    const indexContent = generateIndexTemplate(normalizedName, config.naming.componentExtension);
-    const indexHash = await writeFileWithSignature(
-      indexFilePath,
-      indexContent,
-      getSignature(config, 'typescript'),
-      config.hashing?.normalization
-    );
-    await registerFile(indexFilePath, { 
-      kind: 'component-file', 
-      template: 'index', 
-      hash: indexHash,
-      owner: normalizedName 
-    });
-    writtenFiles.push(indexFilePath);
+    if (!componentExists || options.force) {
+      const componentHash = await writeFileWithSignature(
+        componentFilePath,
+        componentContent,
+        signature,
+        config.hashing?.normalization
+      );
+      await registerFile(componentFilePath, { 
+        kind: 'component', 
+        template: 'component', 
+        hash: componentHash,
+        owner: normalizedName 
+      });
+      writtenFiles.push(componentFilePath);
+    }
     
-    if (shouldCreateTypes) {
+    if (!existsSync(indexFilePath) || options.force) {
+      const indexContent = generateIndexTemplate(normalizedName, config.naming.componentExtension);
+      const indexHash = await writeFileWithSignature(
+        indexFilePath,
+        indexContent,
+        getSignature(config, 'typescript'),
+        config.hashing?.normalization
+      );
+      await registerFile(indexFilePath, { 
+        kind: 'component-file', 
+        template: 'index', 
+        hash: indexHash,
+        owner: normalizedName 
+      });
+      writtenFiles.push(indexFilePath);
+    }
+    
+    if (shouldCreateTypes && (!existsSync(typesFilePath) || options.force)) {
       const typesContent = generateTypesTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         typesFilePath,
@@ -264,7 +276,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(typesFilePath);
     }
     
-    if (shouldCreateContext) {
+    if (shouldCreateContext && (!existsSync(contextFilePath) || options.force)) {
       const contextContent = generateContextTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         contextFilePath,
@@ -281,7 +293,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(contextFilePath);
     }
     
-    if (shouldCreateHook) {
+    if (shouldCreateHook && (!existsSync(hookFilePath) || options.force)) {
       const hookName = getHookFunctionName(normalizedName);
       const hookContent = generateHookTemplate(normalizedName, hookName);
       const hash = await writeFileWithSignature(
@@ -299,7 +311,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(hookFilePath);
     }
     
-    if (shouldCreateTests) {
+    if (shouldCreateTests && (!existsSync(testFilePath) || options.force)) {
       const relativeComponentPath = `../${normalizedName}${config.naming.componentExtension}`;
       const testContent = generateTestTemplate(normalizedName, relativeComponentPath);
       const hash = await writeFileWithSignature(
@@ -317,7 +329,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(testFilePath);
     }
     
-    if (shouldCreateConfig) {
+    if (shouldCreateConfig && (!existsSync(configFilePath) || options.force)) {
       const configContent = generateConfigTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         configFilePath,
@@ -334,7 +346,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(configFilePath);
     }
     
-    if (shouldCreateConstants) {
+    if (shouldCreateConstants && (!existsSync(constantsFilePath) || options.force)) {
       const constantsContent = generateConstantsTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         constantsFilePath,
@@ -351,7 +363,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(constantsFilePath);
     }
 
-    if (shouldCreateApi) {
+    if (shouldCreateApi && (!existsSync(apiFilePath) || options.force)) {
       const apiContent = generateApiTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         apiFilePath,
@@ -368,7 +380,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(apiFilePath);
     }
 
-    if (shouldCreateServices) {
+    if (shouldCreateServices && (!existsSync(servicesFilePath) || options.force)) {
       const servicesContent = generateServiceTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         servicesFilePath,
@@ -385,7 +397,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(servicesFilePath);
     }
 
-    if (shouldCreateSchemas) {
+    if (shouldCreateSchemas && (!existsSync(schemasFilePath) || options.force)) {
       const schemasContent = generateSchemaTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         schemasFilePath,
@@ -402,7 +414,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(schemasFilePath);
     }
 
-    if (shouldCreateReadme) {
+    if (shouldCreateReadme && (!existsSync(readmeFilePath) || options.force)) {
       const readmeContent = generateReadmeTemplate(normalizedName);
       const hash = await writeFileWithSignature(
         readmeFilePath,
@@ -419,7 +431,7 @@ export async function createComponentCommand(componentName, options) {
       writtenFiles.push(readmeFilePath);
     }
 
-    if (shouldCreateStories) {
+    if (shouldCreateStories && (!existsSync(storiesFilePath) || options.force)) {
       const relativePath = `./${normalizedName}${config.naming.componentExtension}`;
       const storiesContent = generateStoriesTemplate(normalizedName, relativePath);
       const hash = await writeFileWithSignature(

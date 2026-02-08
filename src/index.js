@@ -13,3 +13,4 @@ export * from './commands/upgrade-config.js';
 export * from './commands/normalize-state.js';
 export * from './commands/prune-missing.js';
 export * from './commands/rename.js';
+export * from './commands/add-item.js';

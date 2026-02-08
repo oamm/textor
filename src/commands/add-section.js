@@ -307,19 +307,25 @@ export async function addSectionCommand(route, featurePath, options) {
       }
     }
 
-    await ensureNotExists(featureFilePath, options.force);
-    
-    if (shouldCreateIndex) await ensureNotExists(indexFilePath, options.force);
-    if (shouldCreateContext) await ensureNotExists(contextFilePath, options.force);
-    if (shouldCreateHooks) await ensureNotExists(hookFilePath, options.force);
-    if (shouldCreateTests) await ensureNotExists(testFilePath, options.force);
-    if (shouldCreateTypes) await ensureNotExists(typesFilePath, options.force);
-    if (shouldCreateApi) await ensureNotExists(apiFilePath, options.force);
-    if (shouldCreateServices) await ensureNotExists(servicesFilePath, options.force);
-    if (shouldCreateSchemas) await ensureNotExists(schemasFilePath, options.force);
-    if (shouldCreateReadme) await ensureNotExists(readmeFilePath, options.force);
-    if (shouldCreateStories) await ensureNotExists(storiesFilePath, options.force);
-    if (shouldCreateScriptsDir) await ensureNotExists(scriptsIndexPath, options.force);
+    const featureExists = existsSync(featureFilePath);
+    if (featureExists && !options.force) {
+        console.log(`ℹ Feature already exists at ${featureFilePath}. Entering additive mode.`);
+    }
+
+    // Check sub-items only if not in force mode
+    if (!options.force) {
+        if (shouldCreateIndex && existsSync(indexFilePath)) console.log(`  - Skipping existing index: ${indexFilePath}`);
+        if (shouldCreateContext && existsSync(contextFilePath)) console.log(`  - Skipping existing context: ${contextFilePath}`);
+        if (shouldCreateHooks && existsSync(hookFilePath)) console.log(`  - Skipping existing hook: ${hookFilePath}`);
+        if (shouldCreateTests && existsSync(testFilePath)) console.log(`  - Skipping existing test: ${testFilePath}`);
+        if (shouldCreateTypes && existsSync(typesFilePath)) console.log(`  - Skipping existing types: ${typesFilePath}`);
+        if (shouldCreateApi && existsSync(apiFilePath)) console.log(`  - Skipping existing api: ${apiFilePath}`);
+        if (shouldCreateServices && existsSync(servicesFilePath)) console.log(`  - Skipping existing services: ${servicesFilePath}`);
+        if (shouldCreateSchemas && existsSync(schemasFilePath)) console.log(`  - Skipping existing schemas: ${schemasFilePath}`);
+        if (shouldCreateReadme && existsSync(readmeFilePath)) console.log(`  - Skipping existing readme: ${readmeFilePath}`);
+        if (shouldCreateStories && existsSync(storiesFilePath)) console.log(`  - Skipping existing stories: ${storiesFilePath}`);
+        if (shouldCreateScriptsDir && existsSync(scriptsIndexPath)) console.log(`  - Skipping existing scripts: ${scriptsIndexPath}`);
+    }
     
     let layoutImportPath = null;
     const cliProps = options.prop || {};
@@ -460,21 +466,23 @@ export async function addSectionCommand(route, featurePath, options) {
 
     const featureSignature = getSignature(config, config.naming.featureExtension === '.astro' ? 'astro' : 'tsx');
 
-    const featureHash = await writeFileWithSignature(
-      featureFilePath,
-      featureContent,
-      featureSignature,
-      config.hashing?.normalization
-    );
-    await registerFile(featureFilePath, { 
-      kind: 'feature', 
-      template: 'feature', 
-      hash: featureHash,
-      owner: normalizedRoute 
-    });
-    writtenFiles.push(featureFilePath);
+    if (!featureExists || options.force) {
+      const featureHash = await writeFileWithSignature(
+        featureFilePath,
+        featureContent,
+        featureSignature,
+        config.hashing?.normalization
+      );
+      await registerFile(featureFilePath, { 
+        kind: 'feature', 
+        template: 'feature', 
+        hash: featureHash,
+        owner: normalizedRoute 
+      });
+      writtenFiles.push(featureFilePath);
+    }
 
-    if (shouldCreateScriptsDir) {
+    if (shouldCreateScriptsDir && (!existsSync(scriptsIndexPath) || options.force)) {
       const hash = await writeFileWithSignature(
         scriptsIndexPath,
         generateScriptsIndexTemplate(),
@@ -490,7 +498,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(scriptsIndexPath);
     }
 
-    if (shouldCreateIndex) {
+    if (shouldCreateIndex && (!existsSync(indexFilePath) || options.force)) {
       const indexContent = generateIndexTemplate(featureComponentName, config.naming.featureExtension);
       const hash = await writeFileWithSignature(
         indexFilePath,
@@ -507,7 +515,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(indexFilePath);
     }
 
-    if (shouldCreateApi) {
+    if (shouldCreateApi && (!existsSync(apiFilePath) || options.force)) {
       const apiContent = generateApiTemplate(featureComponentName);
       const hash = await writeFileWithSignature(
         apiFilePath, 
@@ -524,7 +532,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(apiFilePath);
     }
 
-    if (shouldCreateServices) {
+    if (shouldCreateServices && (!existsSync(servicesFilePath) || options.force)) {
       const servicesContent = generateServiceTemplate(featureComponentName);
       const hash = await writeFileWithSignature(
         servicesFilePath, 
@@ -541,7 +549,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(servicesFilePath);
     }
 
-    if (shouldCreateSchemas) {
+    if (shouldCreateSchemas && (!existsSync(schemasFilePath) || options.force)) {
       const schemasContent = generateSchemaTemplate(featureComponentName);
       const hash = await writeFileWithSignature(
         schemasFilePath, 
@@ -558,7 +566,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(schemasFilePath);
     }
 
-    if (shouldCreateHooks) {
+    if (shouldCreateHooks && (!existsSync(hookFilePath) || options.force)) {
       const hookName = getHookFunctionName(featureComponentName);
       const hookContent = generateHookTemplate(featureComponentName, hookName);
       const hash = await writeFileWithSignature(
@@ -576,7 +584,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(hookFilePath);
     }
 
-    if (shouldCreateContext) {
+    if (shouldCreateContext && (!existsSync(contextFilePath) || options.force)) {
       const contextContent = generateContextTemplate(featureComponentName);
       const hash = await writeFileWithSignature(
         contextFilePath, 
@@ -593,7 +601,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(contextFilePath);
     }
 
-    if (shouldCreateTests) {
+    if (shouldCreateTests && (!existsSync(testFilePath) || options.force)) {
       const relativeFeaturePath = `./${path.basename(featureFilePath)}`;
       const testContent = generateTestTemplate(featureComponentName, relativeFeaturePath);
       const hash = await writeFileWithSignature(
@@ -611,7 +619,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(testFilePath);
     }
 
-    if (shouldCreateTypes) {
+    if (shouldCreateTypes && (!existsSync(typesFilePath) || options.force)) {
       const typesContent = generateTypesTemplate(featureComponentName);
       const hash = await writeFileWithSignature(
         typesFilePath, 
@@ -628,7 +636,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(typesFilePath);
     }
 
-    if (shouldCreateReadme) {
+    if (shouldCreateReadme && (!existsSync(readmeFilePath) || options.force)) {
       const readmeContent = generateReadmeTemplate(featureComponentName);
       const hash = await writeFileWithSignature(
         readmeFilePath, 
@@ -645,7 +653,7 @@ export async function addSectionCommand(route, featurePath, options) {
       writtenFiles.push(readmeFilePath);
     }
 
-    if (shouldCreateStories) {
+    if (shouldCreateStories && (!existsSync(storiesFilePath) || options.force)) {
       const relativePath = `./${path.basename(featureFilePath)}`;
       const storiesContent = generateStoriesTemplate(featureComponentName, relativePath);
       const hash = await writeFileWithSignature(

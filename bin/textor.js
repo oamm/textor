@@ -15,6 +15,7 @@ import { adoptCommand } from '../src/commands/adopt.js';
 import { upgradeConfigCommand } from '../src/commands/upgrade-config.js';
 import { normalizeStateCommand } from '../src/commands/normalize-state.js';
 import { pruneMissingCommand } from '../src/commands/prune-missing.js';
+import { addItemCommand } from '../src/commands/add-item.js';
 import { renameCommand } from '../src/commands/rename.js';
 
 const program = new Command();
@@ -170,5 +171,12 @@ program
   .option('--accept-changes', 'Allow renaming of modified files')
   .option('--dry-run', 'Show what would be renamed without applying')
   .action(renameCommand);
+
+program
+  .command('add <item> <target>')
+  .description('Add a sub-item (api, hook, test, etc.) to an existing feature or component')
+  .option('--force', 'Overwrite existing files')
+  .option('--dry-run', 'Show what would be created without creating')
+  .action(addItemCommand);
 
 program.parse();

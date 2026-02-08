@@ -209,6 +209,25 @@ pnpm textor rename component Header SiteHeader
 
 Use `--scan` to update imports across the entire project.
 
+### add
+Add a new sub-item (api, hook, test, etc.) to an existing feature or component. This command is additive and will not overwrite existing files unless `--force` is used.
+
+```bash
+# Add API to an existing feature
+pnpm textor add api auth/login
+
+# Add hooks to an existing component
+pnpm textor add hook Button
+
+# Add tests and readme to a feature
+pnpm textor add test auth/login
+pnpm textor add readme auth/login
+```
+
+Textor automatically detects if the target is a feature or a component based on its state.
+
+You can also use the original `add-section` or `create-component` commands with the same flags to add items; they now also support additive mode.
+
 ### remove-section / remove-component
 Safely remove Textor-managed modules.
 
