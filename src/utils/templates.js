@@ -84,6 +84,68 @@ ${layoutOpening}
 `;
 }
 
+export function mergeRouteTemplate(existingContent, featureImportPath, featureComponentName, layoutName) {
+  let content = existingContent;
+  
+  // 1. Add import
+  const importLine = `import ${featureComponentName} from '${featureImportPath}';`;
+  if (!content.includes(importLine)) {
+    // Find the second --- which marks the end of frontmatter
+    const lines = content.split('\n');
+    let frontMatterEndLine = -1;
+    let dashCount = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === '---') {
+        dashCount++;
+        if (dashCount === 2) {
+          frontMatterEndLine = i;
+          break;
+        }
+      }
+    }
+
+    if (frontMatterEndLine !== -1) {
+      lines.splice(frontMatterEndLine, 0, importLine);
+      content = lines.join('\n');
+    } else if (content.includes('---')) {
+      // If only one --- found, maybe it's just the start? 
+      // But standard Astro has two. 
+      // Fallback: insert at the beginning if no frontmatter end found
+      content = importLine + '\n' + content;
+    }
+  }
+
+  // 2. Add component usage
+  const componentTag = `<${featureComponentName} />`;
+  if (!content.includes(componentTag)) {
+    if (layoutName && layoutName !== 'none') {
+      const layoutEndTag = `</${layoutName}>`;
+      if (content.includes(layoutEndTag)) {
+        const lines = content.split('\n');
+        let layoutEndLine = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].includes(layoutEndTag)) {
+            layoutEndLine = i;
+            break;
+          }
+        }
+        if (layoutEndLine !== -1) {
+          lines.splice(layoutEndLine, 0, `  ${componentTag}`);
+          content = lines.join('\n');
+        }
+      } else {
+        // Layout might be self-closing or missing end tag? 
+        // If it's Textor generated it should have it.
+        content += `\n${componentTag}\n`;
+      }
+    } else {
+      content += `\n${componentTag}\n`;
+    }
+  }
+
+  return content;
+}
+
 /**
  * Feature Template Variables:
  * - componentName: Name of the feature component

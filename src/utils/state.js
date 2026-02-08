@@ -86,9 +86,9 @@ export async function addSectionToState(section) {
   if (normalizedSection.featurePath) {
     normalizedSection.featurePath = normalizeStatePath(normalizedSection.featurePath);
   }
-  // Avoid duplicates by route OR by featurePath if route is null
+  // Avoid duplicates by route AND by featurePath
   if (normalizedSection.route) {
-    state.sections = state.sections.filter(s => s.route !== normalizedSection.route);
+    state.sections = state.sections.filter(s => s.route !== normalizedSection.route || s.featurePath !== normalizedSection.featurePath);
   } else {
     state.sections = state.sections.filter(s => s.featurePath !== normalizedSection.featurePath || s.route);
   }
