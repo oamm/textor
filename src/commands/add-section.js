@@ -298,7 +298,11 @@ export async function addSectionCommand(route, featurePath, options) {
         const configSignatures = Object.values(config.signatures || {});
         const isGenerated = await isTextorGenerated(routeFilePath, configSignatures);
         if (!isGenerated && !options.force) {
-          throw new Error(`File already exists: ${routeFilePath}\nUse --force to overwrite.`);
+          if (routeFilePath.endsWith('.astro')) {
+            console.log(`⚠ File already exists and is not managed by Textor. Adopting and merging: ${routeFilePath}`);
+          } else {
+            throw new Error(`File already exists: ${routeFilePath}\nUse --force to overwrite.`);
+          }
         }
       }
     }

@@ -117,8 +117,9 @@ async function adoptFile(relPath, config, state, options) {
   else if (ext === '.js' || ext === '.jsx') signature = config.signatures.javascript;
 
   let finalContent = content;
+  const shouldAddSignature = signature && !content.includes(signature) && options.signature !== false;
 
-  if (signature && !content.includes(signature)) {
+  if (shouldAddSignature) {
     if (options.dryRun) {
       console.log(`  ~ Would add signature to ${relPath}`);
     } else {
@@ -128,9 +129,17 @@ async function adoptFile(relPath, config, state, options) {
     }
   } else {
     if (options.dryRun) {
-      console.log(`  + Would adopt (already has signature or no signature for ext): ${relPath}`);
+      if (signature && !content.includes(signature) && options.signature === false) {
+        console.log(`  + Would adopt without signature (explicitly requested): ${relPath}`);
+      } else {
+        console.log(`  + Would adopt (already has signature or no signature for ext): ${relPath}`);
+      }
     } else {
-      console.log(`  + Adopting: ${relPath}`);
+      if (signature && !content.includes(signature) && options.signature === false) {
+        console.log(`  + Adopting without signature (explicitly requested): ${relPath}`);
+      } else {
+        console.log(`  + Adopting: ${relPath}`);
+      }
     }
   }
 
@@ -140,7 +149,8 @@ async function adoptFile(relPath, config, state, options) {
       kind: inferKind(relPath, config),
       hash: hash,
       timestamp: new Date().toISOString(),
-      synced: true
+      synced: true,
+      hasSignature: options.signature !== false
     };
   }
 
