@@ -137,7 +137,7 @@ program
   .action(syncCommand);
 
 program
-  .command('adopt [path]')
+  .command('adopt [kind] [arg2] [arg3]')
   .description('Adopt untracked files into Textor state, adding signatures')
   .option('--all', 'Adopt all untracked files in managed directories')
   .option('--dry-run', 'Show what would be adopted without applying')

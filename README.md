@@ -276,6 +276,8 @@ Adopt untracked files into Textor's state and add the Textor signature to them. 
 
 ```bash
 pnpm textor adopt <path-or-identifier> [options]
+pnpm textor adopt component <name> [options]
+pnpm textor adopt feature <path> <name> [options]
 ```
 
 **Options:**
@@ -286,6 +288,12 @@ pnpm textor adopt <path-or-identifier> [options]
 ```bash
 # Adopt a specific component directory
 pnpm textor adopt src/components/MyNewButton
+
+# Adopt a component by its name
+pnpm textor adopt component MyNewButton
+
+# Adopt a directory as a new feature (moves files to src/features/my-feat)
+pnpm textor adopt feature path/to/legacy-code my-feat
 
 # Adopt a section by its route
 pnpm textor adopt /users

@@ -1,11 +1,28 @@
 import path from 'path';
-import { readFile, writeFile, stat } from 'fs/promises';
+import { readFile, writeFile, stat, mkdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { loadConfig, resolvePath } from '../utils/config.js';
 import { loadState, saveState, reconstructComponents, reconstructSections } from '../utils/state.js';
 import { calculateHash, scanDirectory, inferKind } from '../utils/filesystem.js';
 
-export async function adoptCommand(identifier, options) {
+export async function adoptCommand(kind, arg2, arg3, options) {
+  // Handle cases where options is in a different position due to variable arguments
+  if (typeof kind === 'object' && kind !== null && !Array.isArray(kind)) {
+    options = kind;
+    kind = undefined;
+    arg2 = undefined;
+    arg3 = undefined;
+  } else if (typeof arg2 === 'object' && arg2 !== null && !Array.isArray(arg2)) {
+    options = arg2;
+    arg2 = undefined;
+    arg3 = undefined;
+  } else if (typeof arg3 === 'object' && arg3 !== null && !Array.isArray(arg3)) {
+    options = arg3;
+    arg3 = undefined;
+  }
+  
+  options = options || {};
+
   try {
     const config = await loadConfig();
     const state = await loadState();
@@ -17,6 +34,9 @@ export async function adoptCommand(identifier, options) {
     };
 
     let filesToAdopt = [];
+    let identifier = kind;
+    let customName = null;
+    let sourcePath = null;
 
     if (!identifier && options.all) {
       // Adopt all untracked files in all roots
@@ -27,6 +47,43 @@ export async function adoptCommand(identifier, options) {
         }
       }
       filesToAdopt = Array.from(managedFiles).filter(f => !state.files[f]);
+    } else if (kind === 'component' && arg2) {
+      const componentName = arg2;
+      const untrackedFiles = new Set();
+      const compPath = path.join(roots.components, componentName);
+      if (existsSync(compPath)) {
+        await scanDirectoryOrFile(compPath, untrackedFiles, state);
+      } else {
+        throw new Error(`Component directory not found: ${compPath}`);
+      }
+      filesToAdopt = Array.from(untrackedFiles);
+    } else if (kind === 'feature' && arg2 && arg3) {
+      sourcePath = arg2;
+      customName = arg3;
+      const targetPath = path.join(roots.features, customName);
+      const absoluteSource = path.resolve(process.cwd(), sourcePath);
+      const absoluteTarget = path.resolve(targetPath);
+
+      if (existsSync(absoluteSource)) {
+        if (!options.dryRun && absoluteSource !== absoluteTarget) {
+          if (!existsSync(path.dirname(absoluteTarget))) {
+            await mkdir(path.dirname(absoluteTarget), { recursive: true });
+          }
+          console.log(`Moving files from ${sourcePath} to ${path.relative(process.cwd(), targetPath)}...`);
+          await rename(absoluteSource, absoluteTarget);
+          sourcePath = path.relative(process.cwd(), targetPath);
+        } else if (options.dryRun && absoluteSource !== absoluteTarget) {
+          console.log(`Dry run: would move files from ${sourcePath} to ${path.relative(process.cwd(), targetPath)}`);
+          sourcePath = path.relative(process.cwd(), targetPath);
+        }
+        
+        const untrackedFiles = new Set();
+        const fullPath = absoluteSource !== absoluteTarget && !options.dryRun ? absoluteTarget : absoluteSource;
+        await scanDirectoryOrFile(fullPath, untrackedFiles, state);
+        filesToAdopt = Array.from(untrackedFiles);
+      } else {
+        throw new Error(`Source path not found: ${absoluteSource}`);
+      }
     } else if (identifier) {
       const untrackedFiles = new Set();
       
