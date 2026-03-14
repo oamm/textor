@@ -208,23 +208,29 @@ export function reconstructSections(state, config) {
   // Keep existing sections if their files still exist
   const validSections = (state.sections || []).filter(section => {
     // Check if route file exists in state.files
-    const routeFile = Object.keys(files).find(f => {
+    const routeFile = section.route ? Object.keys(files).find(f => {
       const normalizedF = f.replace(/\\/g, '/');
       const routePath = section.route === '/' ? 'index' : section.route.slice(1);
       return normalizedF.startsWith(pagesRoot + '/' + routePath + '.') || 
              normalizedF === pagesRoot + '/' + routePath + '/index.astro'; // nested mode
-    });
+    }) : true;
 
     // Check if feature directory has at least one file in state.files
-    const hasFeatureFiles = Object.keys(files).some(f => 
-      f.replace(/\\/g, '/').startsWith(section.featurePath.replace(/\\/g, '/') + '/')
-    );
+    const hasFeatureFiles = section.featurePath ? Object.keys(files).some(f => {
+      const normalizedF = f.replace(/\\/g, '/');
+      const featPath = section.featurePath.replace(/\\/g, '/');
+      return normalizedF.startsWith(featPath + '/') || 
+             normalizedF.startsWith(featuresRoot + '/' + featPath + '/');
+    }) : false;
 
     return routeFile && hasFeatureFiles;
   });
 
   const sections = new Map();
-  validSections.forEach(s => sections.set(s.route, s));
+  validSections.forEach(s => {
+    const key = s.route || `feature:${s.featurePath}`;
+    sections.set(key, s);
+  });
 
   // Try to discover new sections
   for (const filePath in files) {
